@@ -4,6 +4,10 @@ extern crate diesel;
 extern crate tera;
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate serde;
+#[macro_use]
+extern crate futures;
 
 mod app;
 mod models;
@@ -11,15 +15,15 @@ mod routes;
 mod schema;
 
 use actix::prelude::*;
-use app::AppState;
-use diesel::{r2d2::ConnectionManager, PgConnection};
-use dotenv::dotenv;
-use reqwest;
 use actix_web::{
     middleware,
     middleware::identity::{CookieIdentityPolicy, IdentityService},
     web, App, HttpServer,
 };
+use app::AppState;
+use diesel::{r2d2::ConnectionManager, PgConnection};
+use dotenv::dotenv;
+use reqwest::r#async::Client;
 
 use models::DbExecutor;
 
@@ -39,12 +43,15 @@ fn main() {
 
     let address: Addr<DbExecutor> = SyncArbiter::start(4, move || DbExecutor(pool.clone()));
 
+    let _site_url = std::env::var("SITE_URL").expect("SITE_URL must be set");
+
     HttpServer::new(move || {
         let tera = compile_templates!(concat!(env!("CARGO_MANIFEST_DIR"), "/templates/**/*"));
 
         let state = AppState {
             db: address.clone(),
             tera,
+            reqwest: Client::new(), // TODO: Initialise TLS
         };
 
         App::new()
@@ -60,7 +67,8 @@ fn main() {
                 .secure(false), // TODO: Use TLS and make this true
             ))
             .route("/", web::get().to(routes::index::index))
-            .route("/login", web::get().to(routes::auth::login))
+            .route("/auth/login", web::get().to(routes::auth::login))
+            .route("/auth/callback", web::get().to(routes::auth::callback))
     })
     .bind("localhost:3000")
     .expect("can't bind to localhost:3000")
