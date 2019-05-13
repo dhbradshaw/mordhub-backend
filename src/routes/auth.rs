@@ -130,6 +130,15 @@ pub fn login() -> HttpResponse {
         .finish()
 }
 
+pub fn logout(id: Identity) -> HttpResponse {
+    id.forget();
+    
+    // Redirect to homepage
+    HttpResponse::Found()
+        .header("Location", "/")
+        .finish()
+}
+
 pub fn callback(
     id: Identity,
     state: web::Data<AppState>,

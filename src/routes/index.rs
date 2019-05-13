@@ -3,13 +3,10 @@ use actix_web::{error, middleware::identity::Identity, web, Error, HttpResponse}
 
 pub fn index(id: Identity, state: web::Data<AppState>) -> Result<HttpResponse, Error> {
     let mut ctx = tera::Context::new();
-    ctx.insert(
-        "user_url",
-        id.identity()
-            .as_ref()
-            .map(|s| &**s)
-            .unwrap_or("(not logged in)"),
-    );
+
+    if let Some(url) = id.identity() {
+        ctx.insert("user_url", &url);
+    }
 
     let s = state
         .tera

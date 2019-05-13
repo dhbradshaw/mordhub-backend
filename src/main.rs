@@ -68,6 +68,7 @@ fn main() {
             ))
             .route("/", web::get().to(routes::index::index))
             .route("/auth/login", web::get().to(routes::auth::login))
+            .route("/auth/logout", web::get().to(routes::auth::logout))
             .route("/auth/callback", web::get().to(routes::auth::callback))
     })
     .bind("localhost:3000")

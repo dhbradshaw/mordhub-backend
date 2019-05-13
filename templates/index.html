@@ -6,9 +6,13 @@
 
 <body>
 	<h1>Welcome to Mordhub</h1>
-	<p>You are logged in as: {{ user_url }}</p>
-	<a href="/auth/login">
-		<img src="https://steamcommunity-a.akamaihd.net/public/images/signinthroughsteam/sits_01.png"/>
-	</a>
+	{% if user_url %}
+		<p>You are logged in as: {{ user_url }}</p>
+		<a href="/auth/logout">Log out</a>
+	{% else %}
+		<a href="/auth/login">
+			<img src="https://steamcommunity-a.akamaihd.net/public/images/signinthroughsteam/sits_01.png"/>
+		</a>
+	{% endif %}
 </body>
 </html>
