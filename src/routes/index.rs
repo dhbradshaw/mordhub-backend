@@ -6,7 +6,7 @@ pub fn index(user: Option<User>, state: web::Data<AppState>) -> Result<HttpRespo
     let mut ctx = tera::Context::new();
 
     if let Some(user) = user {
-        ctx.insert("user_id", &user.id);
+        ctx.insert("user_id", &user.id.as_u64());
     }
 
     let s = state
