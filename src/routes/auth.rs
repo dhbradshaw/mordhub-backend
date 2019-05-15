@@ -1,8 +1,11 @@
-use crate::app::AppState;
+use crate::state::AppState;
 use actix_web::{middleware::identity::Identity, web, Error, HttpResponse};
 use futures::stream::Concat2;
 use futures::{Async, Future, Poll, Stream};
 use reqwest::r#async::Decoder;
+use url::Url;
+
+const STEAM_URL: &str = "https://steamcommunity.com/openid/login";
 
 #[derive(Serialize)]
 struct OpenIdAuth {
@@ -71,6 +74,7 @@ pub enum VerifyError {
     Reqwest(reqwest::Error),
     Deserialize,
     Invalid,
+    SteamId,
 }
 
 pub struct UrlEncodedVerifyResponse {
@@ -83,7 +87,7 @@ impl Future for UrlEncodedVerifyResponse {
     type Error = VerifyError;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        let bytes = try_ready!(self.concat.poll().map_err(|e| VerifyError::Reqwest(e)));
+        let bytes = try_ready!(self.concat.poll().map_err(VerifyError::Reqwest));
         let s = std::str::from_utf8(&bytes)
             .map_err(|_| VerifyError::Deserialize)?
             .to_owned();
@@ -110,8 +114,6 @@ impl Future for UrlEncodedVerifyResponse {
     }
 }
 
-const STEAM_URL: &'static str = "https://steamcommunity.com/openid/login";
-
 pub fn login() -> HttpResponse {
     let openid = OpenIdAuth::new("http://localhost:3000".to_owned());
 
@@ -132,11 +134,9 @@ pub fn login() -> HttpResponse {
 
 pub fn logout(id: Identity) -> HttpResponse {
     id.forget();
-    
+
     // Redirect to homepage
-    HttpResponse::Found()
-        .header("Location", "/")
-        .finish()
+    HttpResponse::Found().header("Location", "/").finish()
 }
 
 pub fn callback(
@@ -153,7 +153,7 @@ pub fn callback(
             .post(STEAM_URL)
             .form(&*form)
             .send()
-            .map_err(|e| VerifyError::Reqwest(e))
+            .map_err(VerifyError::Reqwest)
             .and_then(move |mut res| {
                 let body = std::mem::replace(res.body_mut(), Decoder::empty());
 
@@ -162,13 +162,21 @@ pub fn callback(
                     claimed_id: form.claimed_id.clone(),
                 }
             })
-            .map(move |claimed_id| {
-                debug!("Verify successful: {}", claimed_id);
-                id.remember(claimed_id);
-                HttpResponse::Found().header("Location", "/").finish()
+            .and_then(move |claimed_id| {
+                // Extract Steam ID
+                let url = Url::parse(&claimed_id).map_err(|_| VerifyError::SteamId)?;
+                let mut segments = url.path_segments().ok_or(VerifyError::SteamId)?;
+                let id_segment = segments.next_back().ok_or(VerifyError::SteamId)?;
+
+                if id_segment.parse::<u64>().is_ok() {
+                    // TODO: API call to test validity?
+                    id.remember(id_segment.to_string());
+                    Ok(HttpResponse::Found().header("Location", "/").finish())
+                } else {
+                    Err(VerifyError::SteamId)
+                }
             })
-            .map_err(|e| {
-                debug!("Verify failed: {:?}", e);
+            .map_err(|_| {
                 HttpResponse::Unauthorized()
                     .body("authentication failed")
                     .into()

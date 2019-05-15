@@ -8,7 +8,6 @@ edition = "2018"
 exclude = ["vendor/*"]
 
 [dependencies]
-actix = "0.8.1"
 actix-web = "1.0.0-beta.3"
 diesel = { version = "1.4.2", features = ["postgres", "uuid", "r2d2", "chrono"] }
 chrono = { version = "0.4.6", features = ["serde"] }
@@ -25,4 +24,6 @@ reqwest = "0.9.16"
 log = "0.4.6"
 serde_urlencoded = "0.5.5"
 futures = "0.1.27"
-serde_yaml = "0.8.9"
+actix-rt = "0.2.2"
+url = "1.7.2"
+failure = "0.1.5"

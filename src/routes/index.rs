@@ -1,11 +1,12 @@
-use crate::app::AppState;
+use crate::models::User;
+use crate::state::AppState;
 use actix_web::{error, middleware::identity::Identity, web, Error, HttpResponse};
 
-pub fn index(id: Identity, state: web::Data<AppState>) -> Result<HttpResponse, Error> {
+pub fn index(user: Option<User>, state: web::Data<AppState>) -> Result<HttpResponse, Error> {
     let mut ctx = tera::Context::new();
 
-    if let Some(url) = id.identity() {
-        ctx.insert("user_url", &url);
+    if let Some(user) = user {
+        ctx.insert("user_id", &user.id);
     }
 
     let s = state

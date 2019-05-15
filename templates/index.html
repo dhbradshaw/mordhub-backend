@@ -6,8 +6,8 @@
 
 <body>
 	<h1>Welcome to Mordhub</h1>
-	{% if user_url %}
-		<p>You are logged in as: {{ user_url }}</p>
+	{% if user_id %}
+		<p>You are logged in as: {{ user_id }}</p>
 		<a href="/auth/logout">Log out</a>
 	{% else %}
 		<a href="/auth/login">
