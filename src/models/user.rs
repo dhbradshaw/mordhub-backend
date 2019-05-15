@@ -1,14 +1,17 @@
-use crate::state::AppState;
 use crate::schema::users;
-use diesel::sql_types::*;
+use crate::state::AppState;
+use actix_web::{
+    dev::Payload, http::StatusCode, middleware::identity::Identity, web, FromRequest, HttpRequest,
+    HttpResponse, ResponseError, error::BlockingError,
+};
 use diesel::backend::Backend;
 use diesel::deserialize::{self, FromSql};
-use diesel::serialize::{self, ToSql, Output};
-use std::{io, str::FromStr};
-use actix_web::{
-    dev::Payload, http::StatusCode, middleware::identity::Identity, FromRequest, HttpRequest,
-    web::Data,
-    HttpResponse, ResponseError,
+use diesel::serialize::{self, Output, ToSql};
+use diesel::sql_types::*;
+use futures::{Future, IntoFuture};
+use std::{
+    io::{self, Write},
+    str::FromStr,
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, FromSqlRow, AsExpression)]
@@ -33,11 +36,17 @@ impl FromStr for SteamId {
     }
 }
 
+impl std::fmt::Display for SteamId {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(formatter, "{}", self.as_u64().to_string())
+    }
+}
+
 impl<DB: Backend> FromSql<BigInt, DB> for SteamId
 where
-    i64: FromSql<BigInt, DB>
+    i64: FromSql<BigInt, DB>,
 {
-    fn from_sql(bytes: Option<&DB::RawValue>) -> deserialize::Result<Self> {    
+    fn from_sql(bytes: Option<&DB::RawValue>) -> deserialize::Result<Self> {
         let v = i64::from_sql(bytes)?;
         Ok(SteamId(v as u64))
     }
@@ -45,7 +54,7 @@ where
 
 impl<DB: Backend> ToSql<BigInt, DB> for SteamId
 where
-    i64: ToSql<BigInt, DB>
+    i64: ToSql<BigInt, DB>,
 {
     fn to_sql<W: io::Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
         self.as_i64().to_sql(out)
@@ -81,37 +90,49 @@ impl ResponseError for UserFindError {
     }
 }
 
-impl FromRequest for User {
+impl FromRequest for SteamId {
     type Error = UserFindError;
     type Future = Result<Self, Self::Error>;
     type Config = ();
 
     fn from_request(req: &HttpRequest, payload: &mut Payload) -> Self::Future {
         let id = Identity::from_request(req, payload).map_err(|_| UserFindError::Identity)?;
-
-        let steam_id_str = id.identity().ok_or(UserFindError::NotFound)?;
-        let steam_id = steam_id_str
+        id.identity()
+            .ok_or(UserFindError::NotFound)?
             .parse::<SteamId>()
-            .map_err(|_| UserFindError::ParseError)?;
+            .map_err(|_| UserFindError::ParseError)
+    }
+}
 
-        let state = Data::<AppState>::from_request(req, payload).map_err(|_| UserFindError::GetState)?;
-        let conn = state.pool.get().unwrap();
+impl FromRequest for User {
+    type Error = BlockingError<UserFindError>;
+    type Future = Box<dyn Future<Item = Self, Error = BlockingError<UserFindError>>>;
+    type Config = ();
 
-        // Look up user in DB
-        let user = {
-            use crate::schema::users::dsl::*;
-            use crate::diesel::{QueryDsl, RunQueryDsl};
-            users.find(steam_id)
-                .first(&conn)
-                .map_err(|e| {
-                    if let diesel::result::Error::NotFound = e {
-                        UserFindError::NotFound
-                    } else {
-                        UserFindError::Db(e)
-                    }
-                })?
-        };
+    fn from_request(req: &HttpRequest, payload: &mut Payload) -> Self::Future {
+        let state = web::Data::<AppState>::from_request(req, payload).expect("can't get app state");
 
-        Ok(user)
+        Box::new(
+            SteamId::from_request(req, payload)
+                .map_err(|e| BlockingError::Error(e))
+                .into_future()
+                .and_then(move |steam_id| {
+                    web::block(move || {
+                        let user = {
+                            use crate::diesel::{QueryDsl, RunQueryDsl};
+                            use crate::schema::users::dsl::*;
+                            users.find(steam_id).first(&state.get_conn()).map_err(|e| {
+                                if let diesel::result::Error::NotFound = e {
+                                    UserFindError::NotFound
+                                } else {
+                                    UserFindError::Db(e)
+                                }
+                            })?
+                        };
+
+                        Ok(user)
+                    })
+                }),
+        )
     }
 }

@@ -1,5 +1,6 @@
+use crate::models::user::{User, SteamId};
 use crate::state::AppState;
-use actix_web::{middleware::identity::Identity, web, Error, HttpResponse};
+use actix_web::{middleware::identity::Identity, web, Error, HttpResponse, error::BlockingError};
 use futures::stream::Concat2;
 use futures::{Async, Future, Poll, Stream};
 use reqwest::r#async::Decoder;
@@ -75,6 +76,8 @@ pub enum VerifyError {
     Deserialize,
     Invalid,
     SteamId,
+    Db(diesel::result::Error),
+    Interrupted,
 }
 
 pub struct UrlEncodedVerifyResponse {
@@ -162,24 +165,48 @@ pub fn callback(
                     claimed_id: form.claimed_id.clone(),
                 }
             })
-            .and_then(move |claimed_id| {
+            .and_then(|claimed_id| {
                 // Extract Steam ID
                 let url = Url::parse(&claimed_id).map_err(|_| VerifyError::SteamId)?;
                 let mut segments = url.path_segments().ok_or(VerifyError::SteamId)?;
                 let id_segment = segments.next_back().ok_or(VerifyError::SteamId)?;
 
-                if id_segment.parse::<u64>().is_ok() {
-                    // TODO: API call to test validity?
-                    id.remember(id_segment.to_string());
-                    Ok(HttpResponse::Found().header("Location", "/").finish())
-                } else {
-                    Err(VerifyError::SteamId)
-                }
+                id_segment
+                    .parse::<SteamId>()
+                    .map_err(|_| VerifyError::SteamId)
             })
-            .map_err(|_| {
+            .and_then(|steam_id| {
+                web::block(move || {
+                    use crate::schema::users;
+                    use crate::diesel::RunQueryDsl;
+
+                    let new_user = User {
+                        id: steam_id,
+                    };
+
+                    diesel::insert_into(users::table)
+                        .values(&new_user)
+                        .on_conflict_do_nothing()
+                        .execute(&state.get_conn())
+                        .map(|_| steam_id)
+                })
+                .map_err(|e| {
+                    match e {
+                        BlockingError::Error(dbe) => VerifyError::Db(dbe),
+                        _ => VerifyError::Interrupted,
+                    }
+                })
+            })
+            .and_then(move |steam_id| {
+                debug!("Verified user {}", steam_id);
+                id.remember(steam_id.to_string());
+                Ok(HttpResponse::Found().header("Location", "/").finish())
+            })
+            .map_err(|e| {
+                debug!("Verify error: {:?}", e);
                 HttpResponse::Unauthorized()
                     .body("authentication failed")
                     .into()
-            }),
+            })
     )
 }

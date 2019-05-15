@@ -1,5 +1,5 @@
 use diesel::{
-    r2d2::{ConnectionManager, Pool},
+    r2d2::{PooledConnection, ConnectionManager, Pool},
     PgConnection,
 };
 use reqwest::r#async::Client;
@@ -9,4 +9,10 @@ pub struct AppState {
     pub pool: Pool<ConnectionManager<PgConnection>>,
     pub tera: Tera,
     pub reqwest: Client,
+}
+
+impl AppState {
+    pub fn get_conn(&self) -> PooledConnection<ConnectionManager<PgConnection>> {
+        self.pool.get().unwrap()
+    }
 }
