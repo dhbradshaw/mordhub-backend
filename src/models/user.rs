@@ -1,20 +1,17 @@
 use crate::schema::users;
 use crate::state::AppState;
 use actix_web::{
-    dev::Payload, http::StatusCode, middleware::identity::Identity, web, FromRequest, HttpRequest,
-    HttpResponse, ResponseError, error::BlockingError,
+    dev::Payload, error::BlockingError, http::StatusCode, middleware::identity::Identity, web,
+    FromRequest, HttpRequest, HttpResponse, ResponseError,
 };
 use diesel::backend::Backend;
 use diesel::deserialize::{self, FromSql};
 use diesel::serialize::{self, Output, ToSql};
 use diesel::sql_types::*;
 use futures::{Future, IntoFuture};
-use std::{
-    io::{self, Write},
-    str::FromStr,
-};
+use std::{io::Write, str::FromStr};
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, FromSqlRow, AsExpression)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, FromSqlRow, AsExpression, Deserialize)]
 #[sql_type = "BigInt"]
 pub struct SteamId(u64);
 
@@ -56,7 +53,7 @@ impl<DB: Backend> ToSql<BigInt, DB> for SteamId
 where
     i64: ToSql<BigInt, DB>,
 {
-    fn to_sql<W: io::Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
+    fn to_sql<W: Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
         self.as_i64().to_sql(out)
     }
 }
@@ -114,7 +111,7 @@ impl FromRequest for User {
 
         Box::new(
             SteamId::from_request(req, payload)
-                .map_err(|e| BlockingError::Error(e))
+                .map_err(BlockingError::Error)
                 .into_future()
                 .and_then(move |steam_id| {
                     web::block(move || {

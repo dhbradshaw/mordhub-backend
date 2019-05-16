@@ -1,6 +1,6 @@
-use crate::models::user::{User, SteamId};
+use crate::models::user::{SteamId, User};
 use crate::state::AppState;
-use actix_web::{middleware::identity::Identity, web, Error, HttpResponse, error::BlockingError};
+use actix_web::{error::BlockingError, middleware::identity::Identity, web, Error, HttpResponse};
 use futures::stream::Concat2;
 use futures::{Async, Future, Poll, Stream};
 use reqwest::r#async::Decoder;
@@ -177,12 +177,10 @@ pub fn callback(
             })
             .and_then(|steam_id| {
                 web::block(move || {
-                    use crate::schema::users;
                     use crate::diesel::RunQueryDsl;
+                    use crate::schema::users;
 
-                    let new_user = User {
-                        id: steam_id,
-                    };
+                    let new_user = User { id: steam_id };
 
                     diesel::insert_into(users::table)
                         .values(&new_user)
@@ -190,11 +188,9 @@ pub fn callback(
                         .execute(&state.get_conn())
                         .map(|_| steam_id)
                 })
-                .map_err(|e| {
-                    match e {
-                        BlockingError::Error(dbe) => VerifyError::Db(dbe),
-                        _ => VerifyError::Interrupted,
-                    }
+                .map_err(|e| match e {
+                    BlockingError::Error(dbe) => VerifyError::Db(dbe),
+                    _ => VerifyError::Interrupted,
                 })
             })
             .and_then(move |steam_id| {
@@ -207,6 +203,6 @@ pub fn callback(
                 HttpResponse::Unauthorized()
                     .body("authentication failed")
                     .into()
-            })
+            }),
     )
 }

@@ -16,14 +16,21 @@ mod routes;
 mod schema;
 mod state;
 
+use actix_files as fs;
 use actix_web::{
+    guard,
+    http::StatusCode,
     middleware,
     middleware::identity::{CookieIdentityPolicy, IdentityService},
-    web, App, HttpServer,
+    web, App, HttpResponse, HttpServer,
 };
 use diesel::{r2d2::ConnectionManager, PgConnection};
 use dotenv::dotenv;
 use reqwest::r#async::Client;
+
+fn handle_404() -> actix_web::Result<fs::NamedFile> {
+    Ok(fs::NamedFile::open("static/404.html")?.set_status_code(StatusCode::NOT_FOUND))
+}
 
 fn main() {
     std::env::set_var("RUST_LOG", "mordhub=debug,actix_web=info");
@@ -60,10 +67,20 @@ fn main() {
                 .name("auth-cookie")
                 .secure(false), // TODO: Use TLS and make this true
             ))
+            // Index
             .route("/", web::get().to(routes::index::index))
+            // TODO: Service
             .route("/auth/login", web::get().to(routes::auth::login))
             .route("/auth/logout", web::get().to(routes::auth::logout))
             .route("/auth/callback", web::get().to(routes::auth::callback))
+            .route("/user/{id}", web::get().to(routes::user::user_profile))
+            .default_service(
+                web::resource("").route(web::get().to(handle_404)).route(
+                    web::route()
+                        .guard(guard::Not(guard::Get()))
+                        .to(HttpResponse::MethodNotAllowed),
+                ),
+            )
     })
     .bind("localhost:3000")
     .expect("can't bind to localhost:3000")

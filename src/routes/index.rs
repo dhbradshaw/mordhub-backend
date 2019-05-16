@@ -1,6 +1,6 @@
 use crate::models::User;
 use crate::state::AppState;
-use actix_web::{error, middleware::identity::Identity, web, Error, HttpResponse};
+use actix_web::{error, web, Error, HttpResponse};
 
 pub fn index(user: Option<User>, state: web::Data<AppState>) -> Result<HttpResponse, Error> {
     let mut ctx = tera::Context::new();

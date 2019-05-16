@@ -1,5 +1,5 @@
 use diesel::{
-    r2d2::{PooledConnection, ConnectionManager, Pool},
+    r2d2::{ConnectionManager, Pool, PooledConnection},
     PgConnection,
 };
 use reqwest::r#async::Client;
