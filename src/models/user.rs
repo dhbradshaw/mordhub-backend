@@ -61,7 +61,14 @@ where
 #[derive(Debug, Insertable, Queryable)]
 #[table_name = "users"]
 pub struct User {
-    pub id: SteamId,
+    pub id: i32,
+    pub steam_id: SteamId,
+}
+
+#[derive(Debug, Insertable)]
+#[table_name = "users"]
+pub struct NewUser {
+    pub steam_id: SteamId,
 }
 
 #[derive(Debug, Fail)]
@@ -113,18 +120,21 @@ impl FromRequest for User {
             SteamId::from_request(req, payload)
                 .map_err(BlockingError::Error)
                 .into_future()
-                .and_then(move |steam_id| {
+                .and_then(move |s_id| {
                     web::block(move || {
                         let user = {
-                            use crate::diesel::{QueryDsl, RunQueryDsl};
+                            use crate::diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
                             use crate::schema::users::dsl::*;
-                            users.find(steam_id).first(&state.get_conn()).map_err(|e| {
-                                if let diesel::result::Error::NotFound = e {
-                                    UserFindError::NotFound
-                                } else {
-                                    UserFindError::Db(e)
-                                }
-                            })?
+                            users
+                                .filter(steam_id.eq(s_id))
+                                .first(&state.get_conn())
+                                .map_err(|e| {
+                                    if let diesel::result::Error::NotFound = e {
+                                        UserFindError::NotFound
+                                    } else {
+                                        UserFindError::Db(e)
+                                    }
+                                })?
                         };
 
                         Ok(user)

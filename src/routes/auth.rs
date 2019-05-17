@@ -1,4 +1,4 @@
-use crate::models::user::{SteamId, User};
+use crate::models::user::{NewUser, SteamId};
 use crate::state::AppState;
 use actix_web::{error::BlockingError, middleware::identity::Identity, web, Error, HttpResponse};
 use futures::stream::Concat2;
@@ -180,7 +180,7 @@ pub fn callback(
                     use crate::diesel::RunQueryDsl;
                     use crate::schema::users;
 
-                    let new_user = User { id: steam_id };
+                    let new_user = NewUser { steam_id };
 
                     diesel::insert_into(users::table)
                         .values(&new_user)

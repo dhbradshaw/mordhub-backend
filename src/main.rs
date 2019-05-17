@@ -22,13 +22,15 @@ use actix_web::{
     http::StatusCode,
     middleware,
     middleware::identity::{CookieIdentityPolicy, IdentityService},
-    web, App, HttpResponse, HttpServer,
+    web, App, Either, HttpResponse, HttpServer,
 };
 use diesel::{r2d2::ConnectionManager, PgConnection};
 use dotenv::dotenv;
 use reqwest::r#async::Client;
 
-fn handle_404() -> actix_web::Result<fs::NamedFile> {
+pub type Or404<T> = Either<T, actix_web::Result<fs::NamedFile>>;
+
+pub fn handle_404() -> actix_web::Result<fs::NamedFile> {
     Ok(fs::NamedFile::open("static/404.html")?.set_status_code(StatusCode::NOT_FOUND))
 }
 
