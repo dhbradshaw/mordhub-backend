@@ -2,7 +2,7 @@ table! {
     images (id) {
         id -> Int4,
         url -> Varchar,
-        uploaded_by -> Int4,
+        uploader_id -> Int4,
         upload_date -> Date,
     }
 }
@@ -12,7 +12,7 @@ table! {
         id -> Int4,
         user_id -> Int4,
         title -> Varchar,
-        main_image_id -> Int4,
+        main_image_id -> Nullable<Int4>,
     }
 }
 
@@ -23,7 +23,7 @@ table! {
     }
 }
 
-joinable!(images -> users (uploaded_by));
+joinable!(images -> users (uploader_id));
 joinable!(loadouts -> images (main_image_id));
 joinable!(loadouts -> users (user_id));
 

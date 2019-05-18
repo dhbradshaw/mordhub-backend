@@ -71,11 +71,15 @@ fn main() {
             ))
             // Index
             .route("/", web::get().to(routes::index::index))
-            // TODO: Service
+            // Auth
             .route("/auth/login", web::get().to(routes::auth::login))
             .route("/auth/logout", web::get().to(routes::auth::logout))
             .route("/auth/callback", web::get().to(routes::auth::callback))
+            // User
             .route("/user/{id}", web::get().to(routes::user::user_profile))
+            // Loadouts
+            .route("/loadouts", web::get().to_async(routes::loadout::list))
+            // 404
             .default_service(
                 web::resource("").route(web::get().to(handle_404)).route(
                     web::route()

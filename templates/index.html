@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<title>Mordhub</title>
+	<title>{% block page_title %}Mordhub{% endblock %}</title>
 </head>
 
 <body>
-	<h1>Welcome to Mordhub</h1>
+	<h1>{% block header %}Welcome to Mordhub{% endblock %}</h1>
+
 	{% if user_id %}
 		<p>You are logged in as: {{ user_id }}</p>
 		<a href="/auth/logout">Log out</a>
@@ -14,5 +15,17 @@
 			<img src="https://steamcommunity-a.akamaihd.net/public/images/signinthroughsteam/sits_01.png"/>
 		</a>
 	{% endif %}
+
+	<div id="nav">
+	{% block nav %}
+		<a href="/">Home</a>
+		<a href="/loadouts">Loadouts</a>
+	{% endblock %}
+	</div>
+
+	<div id="content">
+	{% block content %}
+	{% endblock %}
+	</div>
 </body>
 </html>

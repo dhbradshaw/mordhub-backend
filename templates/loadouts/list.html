@@ -1,0 +1,13 @@
+{% extends "index.html" %}
+{% block page_title %}Loadouts | Mordhub{%endblock%}
+{% block title %}Loadouts{% endblock %}
+
+{% block content %}
+	{% if loadouts | length > 0 %}
+		{% for loadout in loadouts %}
+			<p>Loadout</p>
+		{% endfor %}
+	{% else %}
+		<p>No loadouts available</p>
+	{% endif %}
+{% endblock %}
