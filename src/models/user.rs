@@ -11,7 +11,7 @@ use diesel::sql_types::*;
 use futures::{Future, IntoFuture};
 use std::{io::Write, str::FromStr};
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, FromSqlRow, AsExpression, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, FromSqlRow, AsExpression, Serialize, Deserialize)]
 #[sql_type = "BigInt"]
 pub struct SteamId(u64);
 
@@ -58,7 +58,7 @@ where
     }
 }
 
-#[derive(Debug, Insertable, Queryable)]
+#[derive(Debug, Insertable, Queryable, Serialize)]
 #[table_name = "users"]
 pub struct User {
     pub id: i32,

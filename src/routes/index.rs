@@ -1,18 +1,8 @@
 use crate::models::User;
 use crate::state::AppState;
-use actix_web::{error, web, Error, HttpResponse};
+use actix_web::{web, HttpResponse};
 
-pub fn index(user: Option<User>, state: web::Data<AppState>) -> Result<HttpResponse, Error> {
-    let mut ctx = tera::Context::new();
-
-    if let Some(user) = user {
-        ctx.insert("user_id", &user.steam_id.as_u64());
-    }
-
-    let s = state
-        .tera
-        .render("index.html", &ctx)
-        .map_err(|_| error::ErrorInternalServerError("Template error"))?;
-
-    Ok(HttpResponse::Ok().content_type("text/html").body(s))
+pub fn index(user: Option<User>, state: web::Data<AppState>) -> HttpResponse {
+    let ctx = AppState::tera_with_user(user);
+    state.render_http("index.html", &ctx)
 }

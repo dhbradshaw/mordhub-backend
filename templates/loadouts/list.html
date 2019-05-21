@@ -3,6 +3,8 @@
 {% block title %}Loadouts{% endblock %}
 
 {% block content %}
+	<a href="/loadouts/create">Create</a>
+	<br>
 	{% if loadouts | length > 0 %}
 		{% for loadout in loadouts %}
 			<p>Loadout</p>

@@ -1,0 +1,20 @@
+{% extends "index.html" %}
+{% block page_title %}Loadouts | Mordhub{%endblock%}
+{% block title %}Loadouts{% endblock %}
+
+{% block content %}
+	<br>
+	Name: <input type="text" name="name"/><br>
+	Data: <input type="text" name="data" width="500"/><br>
+	Url: <output id="url_out" name="url"/><br>
+	<button onclick="widget.open()">Upload Image</button>
+	<script src="https://widget.cloudinary.com/v2.0/global/all.js" type="text/javascript"></script>
+	<script>
+		var widget = cloudinary.createUploadWidget({ cloudName: "zeta64", uploadPreset: "loadout" }, (error, result) => {
+			if (result && result.event == "success") {
+				console.log(result.info.secure_url);
+				document.getElementById("url_out").innerHTML = result.info.secure_url;
+			}
+		});
+	</script>
+{% endblock %}

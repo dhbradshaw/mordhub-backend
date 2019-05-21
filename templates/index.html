@@ -7,8 +7,8 @@
 <body>
 	<h1>{% block header %}Welcome to Mordhub{% endblock %}</h1>
 
-	{% if user_id %}
-		<p>You are logged in as: {{ user_id }}</p>
+	{% if user %}
+		<p>You are logged in as: {{ user.steam_id }}</p>
 		<a href="/auth/logout">Log out</a>
 	{% else %}
 		<a href="/auth/login">

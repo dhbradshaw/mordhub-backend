@@ -1,10 +1,13 @@
-use crate::futures::Future;
-use crate::models::Loadout;
+use crate::models::{Loadout, User};
 use crate::state::AppState;
-use actix_web::{error, web, HttpResponse};
+use actix_web::{web, HttpResponse};
 use diesel::prelude::*;
+use futures::Future;
 
-pub fn list(state: web::Data<AppState>) -> impl Future<Item = HttpResponse, Error = ()> {
+pub fn list(
+    user: Option<User>,
+    state: web::Data<AppState>,
+) -> impl Future<Item = HttpResponse, Error = ()> {
     web::block(move || {
         use crate::schema::loadouts::dsl::*;
 
@@ -15,17 +18,21 @@ pub fn list(state: web::Data<AppState>) -> impl Future<Item = HttpResponse, Erro
     })
     .map_err(|_| ())
     .and_then(|(state, ldts)| {
-        let mut ctx = tera::Context::new();
-
+        let mut ctx = AppState::tera_with_user(user);
         ctx.insert("loadouts", &ldts);
+        Ok(state.render_http("loadouts/list.html", &ctx))
+    })
+    .or_else(|_| Ok(HttpResponse::InternalServerError().into()))
+}
 
-        state
-            .tera
-            .render("loadouts/list.html", &ctx)
-            .map_err(|_| ())
-    })
-    .then(|string| match string {
-        Ok(s) => Ok(HttpResponse::Ok().content_type("text/html").body(s)),
-        Err(_) => Ok(HttpResponse::InternalServerError().into()),
-    })
+pub fn create(user: Option<User>, state: web::Data<AppState>) -> HttpResponse {
+    if user.is_none() {
+        return HttpResponse::Found()
+            .header("Location", "/auth/login")
+            .finish();
+    }
+
+    let ctx = AppState::tera_with_user(user);
+
+    state.render_http("loadouts/create.html", &ctx)
 }

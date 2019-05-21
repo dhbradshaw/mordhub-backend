@@ -7,8 +7,6 @@ extern crate log;
 #[macro_use]
 extern crate serde;
 #[macro_use]
-extern crate futures;
-#[macro_use]
 extern crate failure;
 
 mod models;
@@ -46,7 +44,7 @@ fn main() {
     let manager = ConnectionManager::<PgConnection>::new(db_url);
     let pool = r2d2::Pool::builder()
         .build(manager)
-        .expect("failed to create pool");
+        .expect("failed to create db pool");
 
     HttpServer::new(move || {
         let tera = compile_templates!(concat!(env!("CARGO_MANIFEST_DIR"), "/templates/**/*"));
@@ -74,11 +72,15 @@ fn main() {
             // Auth
             .route("/auth/login", web::get().to(routes::auth::login))
             .route("/auth/logout", web::get().to(routes::auth::logout))
-            .route("/auth/callback", web::get().to(routes::auth::callback))
+            .route(
+                "/auth/callback",
+                web::get().to_async(routes::auth::callback),
+            )
             // User
             .route("/user/{id}", web::get().to(routes::user::user_profile))
             // Loadouts
             .route("/loadouts", web::get().to_async(routes::loadout::list))
+            .route("/loadouts/create", web::get().to(routes::loadout::create))
             // 404
             .default_service(
                 web::resource("").route(web::get().to(handle_404)).route(
