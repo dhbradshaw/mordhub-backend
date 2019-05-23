@@ -7,7 +7,7 @@ CREATE TABLE images (
   id SERIAL PRIMARY KEY,
   url VARCHAR(50) NOT NULL,
   uploader_id INTEGER NOT NULL REFERENCES users(id),
-  upload_date DATE NOT NULL
+  upload_date DATE DEFAULT CURRENT_DATE
 );
 
 CREATE TABLE loadouts (

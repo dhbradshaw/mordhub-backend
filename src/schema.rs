@@ -3,7 +3,7 @@ table! {
         id -> Int4,
         url -> Varchar,
         uploader_id -> Int4,
-        upload_date -> Date,
+        upload_date -> Nullable<Date>,
     }
 }
 
@@ -27,4 +27,8 @@ joinable!(images -> users (uploader_id));
 joinable!(loadouts -> images (main_image_id));
 joinable!(loadouts -> users (user_id));
 
-allow_tables_to_appear_in_same_query!(images, loadouts, users,);
+allow_tables_to_appear_in_same_query!(
+    images,
+    loadouts,
+    users,
+);

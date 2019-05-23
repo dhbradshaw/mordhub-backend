@@ -1,5 +1,5 @@
+use crate::app::State;
 use crate::schema::users;
-use crate::state::AppState;
 use actix_web::{
     dev::Payload, error::BlockingError, http::StatusCode, middleware::identity::Identity, web,
     FromRequest, HttpRequest, HttpResponse, ResponseError,
@@ -114,7 +114,7 @@ impl FromRequest for User {
     type Config = ();
 
     fn from_request(req: &HttpRequest, payload: &mut Payload) -> Self::Future {
-        let state = web::Data::<AppState>::from_request(req, payload).expect("can't get app state");
+        let state = web::Data::<State>::from_request(req, payload).expect("can't get app state");
 
         Box::new(
             SteamId::from_request(req, payload)

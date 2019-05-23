@@ -1,5 +1,5 @@
+use crate::app::State;
 use crate::models::user::{NewUser, SteamId};
-use crate::state::AppState;
 use actix_web::{error::BlockingError, middleware::identity::Identity, web, Error, HttpResponse};
 use futures::{Future, Stream};
 use url::Url;
@@ -105,7 +105,7 @@ pub fn logout(id: Identity) -> HttpResponse {
 
 pub fn callback(
     id: Identity,
-    state: web::Data<AppState>,
+    state: web::Data<State>,
     mut form: web::Query<OpenIdVerify>,
 ) -> impl Future<Item = HttpResponse, Error = Error> {
     form.mode = "check_authentication".to_owned();

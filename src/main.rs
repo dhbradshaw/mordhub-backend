@@ -9,28 +9,23 @@ extern crate serde;
 #[macro_use]
 extern crate failure;
 
+mod app;
 mod models;
 mod routes;
 mod schema;
-mod state;
 
 use actix_files as fs;
 use actix_web::{
+    cookie::SameSite,
     guard,
     http::StatusCode,
     middleware,
     middleware::identity::{CookieIdentityPolicy, IdentityService},
-    web, App, Either, HttpResponse, HttpServer,
+    web, App, Either, HttpResponse, HttpServer, ResponseError,
 };
 use diesel::{r2d2::ConnectionManager, PgConnection};
 use dotenv::dotenv;
 use reqwest::r#async::Client;
-
-pub type Or404<T> = Either<T, actix_web::Result<fs::NamedFile>>;
-
-pub fn handle_404() -> actix_web::Result<fs::NamedFile> {
-    Ok(fs::NamedFile::open("static/404.html")?.set_status_code(StatusCode::NOT_FOUND))
-}
 
 fn main() {
     std::env::set_var("RUST_LOG", "mordhub=debug,actix_web=info");
@@ -47,9 +42,9 @@ fn main() {
         .expect("failed to create db pool");
 
     HttpServer::new(move || {
-        let tera = compile_templates!(concat!(env!("CARGO_MANIFEST_DIR"), "/templates/**/*"));
+        let tera = tera::Tera::new("templates/**/*").expect("failed to compile templates");
 
-        let state = state::AppState {
+        let state = app::State {
             pool: pool.clone(),
             tera,
             reqwest: Client::new(), // TODO: Initialise TLS
@@ -65,6 +60,7 @@ fn main() {
                         .as_bytes(),
                 )
                 .name("auth-cookie")
+                .same_site(SameSite::Lax) // CSRF mitigation (TODO: add form token mitigation as well)
                 .secure(false), // TODO: Use TLS and make this true
             ))
             // Index
@@ -77,17 +73,26 @@ fn main() {
                 web::get().to_async(routes::auth::callback),
             )
             // User
-            .route("/user/{id}", web::get().to(routes::user::user_profile))
+            .route("/users/{id}", web::get().to(routes::user::user_profile))
             // Loadouts
             .route("/loadouts", web::get().to_async(routes::loadout::list))
-            .route("/loadouts/create", web::get().to(routes::loadout::create))
+            .route(
+                "/loadouts/create",
+                web::get().to(routes::loadout::create_get),
+            )
+            .route(
+                "/loadouts/create",
+                web::post().to_async(routes::loadout::create_post),
+            )
             // 404
             .default_service(
-                web::resource("").route(web::get().to(handle_404)).route(
-                    web::route()
-                        .guard(guard::Not(guard::Get()))
-                        .to(HttpResponse::MethodNotAllowed),
-                ),
+                web::resource("")
+                    .route(web::get().to(|| app::Error::NotFound.error_response()))
+                    .route(
+                        web::route()
+                            .guard(guard::Not(guard::Get()))
+                            .to(HttpResponse::MethodNotAllowed),
+                    ),
             )
     })
     .bind("localhost:3000")
