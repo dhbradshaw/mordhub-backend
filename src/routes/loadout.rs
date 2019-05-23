@@ -72,7 +72,6 @@ pub fn create_post(
         web::block(|| {
             use crate::schema::loadouts;
             let new_loadout = NewLoadout {
-
             };
             diesel::insert_into(loadouts
         })

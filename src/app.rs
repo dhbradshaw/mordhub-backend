@@ -1,5 +1,5 @@
 use crate::models::User;
-use actix_web::{error::BlockingError, HttpResponse, Responder, ResponseError};
+use actix_web::{error::BlockingError, HttpResponse, ResponseError};
 use diesel::{
     r2d2::{ConnectionManager, Pool, PooledConnection},
     PgConnection,
@@ -62,9 +62,18 @@ impl ResponseError for Error {
                 .and_then(|s| Ok(HttpResponse::NotFound().content_type("text/html").body(s)))
                 .unwrap_or_else(|_| HttpResponse::InternalServerError().into())
             }
+
             #[cfg(debug_assertions)]
             Error::Database(e) => HttpResponse::InternalServerError().body(e.to_string()),
-            _ => HttpResponse::InternalServerError().into(),
+
+            #[cfg(debug_assertions)]
+            x @ Error::Template | x @ Error::CanceledBlock => {
+                HttpResponse::InternalServerError().body(x.to_string())
+            }
+
+            // TODO: Render a nice HTML file instead in release
+            #[allow(unreachable_patterns)]
+            _ => HttpResponse::InternalServerError().body("Unknown internal server error"),
         }
     }
 }

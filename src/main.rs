@@ -1,8 +1,6 @@
 #[macro_use]
 extern crate diesel;
 #[macro_use]
-extern crate tera;
-#[macro_use]
 extern crate log;
 #[macro_use]
 extern crate serde;
@@ -14,14 +12,11 @@ mod models;
 mod routes;
 mod schema;
 
-use actix_files as fs;
 use actix_web::{
     cookie::SameSite,
-    guard,
-    http::StatusCode,
-    middleware,
+    guard, middleware,
     middleware::identity::{CookieIdentityPolicy, IdentityService},
-    web, App, Either, HttpResponse, HttpServer, ResponseError,
+    web, App, HttpResponse, HttpServer, ResponseError,
 };
 use diesel::{r2d2::ConnectionManager, PgConnection};
 use dotenv::dotenv;

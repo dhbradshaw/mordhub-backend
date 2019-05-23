@@ -1,6 +1,6 @@
 use crate::app::{self, State};
-use crate::models::user::{SteamId, User};
-use actix_web::{web, HttpResponse};
+use crate::models::user::SteamId;
+use actix_web::web;
 
 pub fn user_profile(
     id: Option<web::Path<SteamId>>,
