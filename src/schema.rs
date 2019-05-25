@@ -2,8 +2,17 @@ table! {
     images (id) {
         id -> Int4,
         url -> Varchar,
-        uploader_id -> Int4,
-        upload_date -> Nullable<Date>,
+        loadout_id -> Int4,
+        position -> Int4,
+        created_at -> Timestamp,
+    }
+}
+
+table! {
+    likes (id) {
+        id -> Int4,
+        user_id -> Int4,
+        loadout_id -> Int4,
     }
 }
 
@@ -11,8 +20,9 @@ table! {
     loadouts (id) {
         id -> Int4,
         user_id -> Int4,
-        title -> Varchar,
-        main_image_id -> Nullable<Int4>,
+        name -> Varchar,
+        data -> Varchar,
+        created_at -> Timestamp,
     }
 }
 
@@ -23,8 +33,9 @@ table! {
     }
 }
 
-joinable!(images -> users (uploader_id));
-joinable!(loadouts -> images (main_image_id));
+joinable!(images -> loadouts (loadout_id));
+joinable!(likes -> loadouts (loadout_id));
+joinable!(likes -> users (user_id));
 joinable!(loadouts -> users (user_id));
 
-allow_tables_to_appear_in_same_query!(images, loadouts, users,);
+allow_tables_to_appear_in_same_query!(images, likes, loadouts, users,);

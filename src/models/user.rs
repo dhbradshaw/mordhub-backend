@@ -58,7 +58,7 @@ where
     }
 }
 
-#[derive(Debug, Insertable, Queryable, Serialize)]
+#[derive(Debug, Clone, Insertable, Queryable, Serialize)]
 #[table_name = "users"]
 pub struct User {
     pub id: i32,
@@ -126,14 +126,12 @@ impl FromRequest for User {
                             use crate::diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
                             use crate::schema::users::dsl::*;
                             users
+                                // TODO: Use user.id instead of user.steam_id?
                                 .filter(steam_id.eq(s_id))
                                 .first(&state.get_conn())
-                                .map_err(|e| {
-                                    if let diesel::result::Error::NotFound = e {
-                                        UserFindError::NotFound
-                                    } else {
-                                        UserFindError::Db(e)
-                                    }
+                                .map_err(|e| match e {
+                                    diesel::result::Error::NotFound => UserFindError::NotFound,
+                                    _ => UserFindError::Db(e),
                                 })?
                         };
 

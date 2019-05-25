@@ -79,6 +79,10 @@ fn main() {
                 "/loadouts/create",
                 web::post().to_async(routes::loadout::create_post),
             )
+            .route(
+                "/loadouts/{id}",
+                web::get().to_async(routes::loadout::single),
+            )
             // 404
             .default_service(
                 web::resource("")
