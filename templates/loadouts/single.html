@@ -7,6 +7,7 @@
 	<br>
 	<h1>{{ loadout.name }}</h1>
 	<p>{{ loadout.data }}</p>
+	<p>{{ loadout.like_count }} - {{ loadout.has_liked }}</p>
 	{% if images | length > 0 %}
 		{% for image in images %}
 			<p>{{ image.url }}</p>

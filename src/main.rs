@@ -18,6 +18,7 @@ use actix_web::{
     middleware::identity::{CookieIdentityPolicy, IdentityService},
     web, App, HttpResponse, HttpServer, ResponseError,
 };
+use actix_files as fs;
 use diesel::{r2d2::ConnectionManager, PgConnection};
 use dotenv::dotenv;
 use reqwest::r#async::Client;
@@ -83,6 +84,8 @@ fn main() {
                 "/loadouts/{id}",
                 web::get().to_async(routes::loadout::single),
             )
+            // Static files
+            .service(fs::Files::new("/static", "./static/"))
             // 404
             .default_service(
                 web::resource("")

@@ -1,8 +1,8 @@
 use crate::app::{self, State};
-use crate::models::{image::NewImage, loadout::NewLoadout, Image, Like, Loadout, User};
+use crate::models::{image::NewImage, loadout::NewLoadout, Image, Loadout, User};
 use actix_web::{web, HttpResponse};
 use diesel::prelude::*;
-use futures::{future::Either, Future, IntoFuture};
+use futures::Future;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct CreateLoadout {
@@ -16,21 +16,15 @@ pub fn list(
     user: Option<User>,
     state: web::Data<State>,
 ) -> impl Future<Item = HttpResponse, Error = app::Error> {
-    web::block(move || {
-        use crate::schema::loadouts::dsl::*;
+    let state2 = state.clone();
 
-        loadouts
-            .limit(10)
-            .load::<Loadout>(&state.get_conn())
-            .map(|ldts| (state, ldts))
-            .map_err(app::Error::from)
-    })
-    .from_err()
-    .and_then(|(state, ldts)| {
-        let mut ctx = State::tera_with_user(user);
-        ctx.insert("loadouts", &ldts);
-        state.render("loadouts/list.html", ctx)
-    })
+    web::block(move || Loadout::query_multiple(&state.get_conn()).map_err(app::Error::from))
+        .from_err()
+        .and_then(move |ldts| {
+            let mut ctx = State::tera_with_user(user);
+            ctx.insert("loadouts", &ldts);
+            state2.render("loadouts/list.html", ctx)
+        })
 }
 
 pub fn create_get(user: Option<User>, state: web::Data<State>) -> Result<HttpResponse, app::Error> {
@@ -49,6 +43,7 @@ pub fn create_post(
     state: web::Data<State>,
 ) -> impl Future<Item = HttpResponse, Error = app::Error> {
     // TODO: Check CSRF token
+    // TODO: Sanitize these inputs
     let cloudinary_url = format!(
         "https://res.cloudinary.com/zeta64/image/upload/{}.{}",
         &form.cloudinary_id, &form.cloudinary_format
@@ -68,17 +63,18 @@ pub fn create_post(
 
         diesel::insert_into(loadouts::table)
             .values(&new_loadout)
-            .get_result::<Loadout>(&state.get_conn())
+            .returning(loadouts::id)
+            .get_result::<i32>(&state.get_conn())
             .map_err(app::Error::from)
     })
     .from_err()
-    .and_then(move |loadout| {
+    .and_then(move |loadout_id| {
         web::block(move || {
             use crate::schema::images;
 
             let new_image = NewImage {
                 url: cloudinary_url,
-                loadout_id: loadout.id,
+                loadout_id,
                 position: 0,
             };
 
@@ -86,7 +82,7 @@ pub fn create_post(
                 .values(&new_image)
                 .execute(&state_2.clone().get_conn())
                 .map_err(app::Error::from)
-                .map(|_| loadout.id)
+                .map(|_| loadout_id)
         })
     })
     .from_err()
@@ -104,28 +100,11 @@ pub fn single(
 ) -> impl Future<Item = HttpResponse, Error = app::Error> {
     let state2 = state.clone();
     let state3 = state.clone();
-    let state4 = state.clone();
-    let state5 = state.clone();
     let ld_id = *ld_id;
+    let user2 = user.clone();
 
     let loadout_future = web::block(move || {
-        use crate::schema::loadouts::dsl::*;
-
-        loadouts
-            .find(ld_id as i32)
-            .first(&state.get_conn())
-            .map_err(app::Error::db_or_404)
-    })
-    .from_err();
-
-    let like_count_future = web::block(move || {
-        use crate::schema::likes::dsl::*;
-
-        likes
-            .filter(loadout_id.eq(ld_id as i32))
-            .count()
-            .get_result(&state2.get_conn())
-            .map_err(app::Error::from)
+        Loadout::query_single(ld_id as i32, user2, &state.get_conn()).map_err(app::Error::db_or_404)
     })
     .from_err();
 
@@ -135,47 +114,18 @@ pub fn single(
         images
             .filter(loadout_id.eq(ld_id as i32))
             .order_by(position)
-            .load::<Image>(&state3.get_conn())
+            .load::<Image>(&state2.get_conn())
             .map_err(app::Error::from)
     })
     .from_err();
 
-    let has_liked_future = if let Some(user) = user.as_ref().cloned() {
-        // If they're logged in, check to see if they already liked this
-        Either::A(
-            web::block(move || {
-                use crate::schema::likes::dsl::*;
-
-                let res = likes
-                    .filter(user_id.eq(user.id))
-                    .filter(loadout_id.eq(ld_id as i32))
-                    .first::<Like>(&state4.get_conn());
-
-                match res {
-                    Ok(_) => Ok(true),
-                    Err(diesel::result::Error::NotFound) => Ok(false),
-                    Err(e) => Err(app::Error::from(e)),
-                }
-            })
-            .from_err(),
-        )
-    } else {
-        // Otherwise, they didn't already like this
-        Either::B(Ok(false).into_future())
-    };
-
     // Run queries in parallel
-    // TODO: Make 404 reliable
     images_future
-        .join4(loadout_future, like_count_future, has_liked_future)
-        .and_then(
-            move |(images, loadout, like_count, has_liked): (Vec<Image>, Loadout, i64, bool)| {
-                let mut ctx = State::tera_with_user(user);
-                ctx.insert("loadout", &loadout);
-                ctx.insert("images", &images);
-                ctx.insert("like_count", &like_count);
-                ctx.insert("has_liked", &has_liked);
-                state5.render("loadouts/single.html", ctx)
-            },
-        )
+        .join(loadout_future)
+        .and_then(move |(images, loadout): (Vec<Image>, Loadout)| {
+            let mut ctx = State::tera_with_user(user);
+            ctx.insert("loadout", &loadout);
+            ctx.insert("images", &images);
+            state3.render("loadouts/single.html", ctx)
+        })
 }

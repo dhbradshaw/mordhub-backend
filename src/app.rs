@@ -33,7 +33,7 @@ impl State {
     pub fn render(&self, tmpl: &'static str, ctx: Context) -> Result<HttpResponse, Error> {
         match self.tera.render(tmpl, ctx) {
             Ok(s) => Ok(HttpResponse::Ok().content_type("text/html").body(s)),
-            Err(_) => Err(crate::app::Error::Template),
+            Err(e) => Err(crate::app::Error::Template(format!("{:?}", e))),
         }
     }
 }
@@ -42,8 +42,8 @@ impl State {
 pub enum Error {
     #[fail(display = "database error: {}", _0)]
     Database(diesel::result::Error),
-    #[fail(display = "template error")]
-    Template,
+    #[fail(display = "template error: {}", _0)]
+    Template(String),
     #[fail(display = "canceled block")]
     CanceledBlock,
     #[fail(display = "404 not found")]
@@ -56,6 +56,14 @@ pub enum Error {
 
 impl ResponseError for Error {
     fn error_response(&self) -> HttpResponse {
+        match self {
+            Error::NotFound => HttpResponse::NotFound().into(),
+            Error::RedirectToLogin => HttpResponse::Found().into(),
+            _ => HttpResponse::InternalServerError().into(),
+        }
+    }
+
+    fn render_response(&self) -> HttpResponse {
         #[allow(unreachable_patterns)]
         match self {
             Error::NotFound => {
@@ -65,18 +73,21 @@ impl ResponseError for Error {
                     f.read_to_string(&mut s).map(|_| s)
                 })
                 .and_then(|s| Ok(HttpResponse::NotFound().content_type("text/html").body(s)))
-                .unwrap_or_else(|_| HttpResponse::InternalServerError().into())
+                .unwrap_or_else(|_| HttpResponse::NotFound().into())
             }
 
-            Error::RedirectToLogin => HttpResponse::Found()
+            Error::RedirectToLogin => dbg!(HttpResponse::Found()
                 .header("Location", "/auth/login")
-                .finish(),
+                .finish()),
 
             #[cfg(debug_assertions)]
             Error::Database(e) => HttpResponse::InternalServerError().body(e.to_string()),
 
             #[cfg(debug_assertions)]
-            x @ Error::Template | x @ Error::CanceledBlock | x @ Error::Unauthorized => {
+            Error::Template(e) => HttpResponse::InternalServerError().body(e.to_string()),
+
+            #[cfg(debug_assertions)]
+            x @ Error::CanceledBlock | x @ Error::Unauthorized => {
                 HttpResponse::InternalServerError().body(x.to_string())
             }
 

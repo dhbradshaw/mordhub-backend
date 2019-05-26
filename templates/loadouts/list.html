@@ -7,7 +7,7 @@
 	<br>
 	{% if loadouts | length > 0 %}
 		{% for loadout in loadouts %}
-			<p>Loadout</p>
+			<p>{{ loadout.name }} - {{loadout.like_count }} - {{ loadout.has_liked }}</p>
 		{% endfor %}
 	{% else %}
 		<p>No loadouts available</p>
