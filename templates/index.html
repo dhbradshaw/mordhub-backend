@@ -7,7 +7,10 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
 	<!-- UIkit CSS -->
-	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/uikit/3.1.5/css/uikit.min.css" />
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/uikit/3.1.5/css/uikit.min.css"/>
+
+	<!-- Custom CSS -->
+	<link rel="stylesheet" href="/static/css/site.css"/>
 
 	<!-- UIkit JS -->
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/uikit/3.1.5/js/uikit.min.js"></script>
@@ -15,52 +18,50 @@
 </head>
 
 <body>
-	<header class="uk-box-shadow-small" style="background-color: white">
+	<header id="site-head">
 		<div class="uk-container uk-container-expand">
-			<nav class="uk-navbar" id="navbar" data-uk-navbar>
-
-			{% block nav %}
-				<div class="uk-navbar-left">
-					<a class="uk-navbar-item uk-logo" href="#">MordHub</a>
+			<div class="uk-grid uk-grid-medium uk-flex uk-flex-middle" data-uk-grid>
+				<div class="uk-width-auto">
+					<a href="/" class="uk-link-heading">MordHub</a>
 				</div>
-					
-				<div class="uk-navbar-right">
-					<ul class="uk-navbar-nav uk-visible@m">
-						<li class="{% if page_type is streq("Home") %}uk-active{% endif %}"><a href="/">Home</a></li>
-						<li class="{% if page_type is streq("Loadouts") %}uk-active{% endif %}"><a href="/loadouts">Loadouts</a></li>
-						<li class="{% if page_type is streq("About") %}uk-active{% endif %}"><a href="/about">About</a></li>
+				<div class="uk-width-expand"></div>
+				<div class="uk-width-auto">
+					<ul class="uk-subnav" data-uk-margin>
+						<li class="uk-visible@s {% if page_type is streq("Home") %}uk-active{% endif %}"><a href="/">Home</a></li>
+						<li class="uk-visible@s {% if page_type is streq("Loadouts") %}uk-active{% endif %}"><a href="/loadouts">Loadouts</a></li>
+						<li class="uk-visible@s {% if page_type is streq("About") %}uk-active{% endif %}"><a href="/about">About</a></li>
 						{% if user %}
-							<li class="uk-active"><a href="/users/{{ user.steam_id }}">{{ user.id }}</a></li>
-							<li><a href="/auth/logout">Log out</a></li>
+							<li class="uk-visible@s uk-active"><a href="/users/{{ user.steam_id }}">{{ user.id }}</a></li>
+							<li class="uk-visible@s"><a href="/auth/logout">Log out</a></li>
 						{% else %}
-							<li><a href="/auth/login">
+							<li class="uk-visible@s"><a href="/auth/login">
 								<img src="https://steamcommunity-a.akamaihd.net/public/images/signinthroughsteam/sits_01.png"/>
-							</a><li>
+							</a><li class="uk-visible@s">
 						{% endif %}
 					</ul>
 				</div>
-			{% endblock %}
-			</nav>
+			</div>
 		</div>
 	</header>
 
+	<div class="spacer"></div>
+
+	{% block outer_content %}
 	<section class="uk-section"> 
 		<div class="uk-container uk-container-small">
 			<h1 class="uk-heading-primary">{{ page_title }}</h1>
-
 			{% block content %}
-			{% endblock %}
+			{% endblock content %}
 		</div>
 	</section>
+	{% endblock outer_content %}
 
-	<footer class="uk-section uk-section-small" style="margin-bottom: 60px">
-		<div class="uk-container">
-			<hr>
+	<footer id="site-foot" class="uk-section uk-section-secondary uk-section-xsmall">
+		<div class="uk-container uk-text-small uk-text-center">
 			<p class="uk-text-small uk-text-center">
-				Copyright 2019 &middot;
-				Created by Matt Taylor &middot;
-				<a href="https://github.com/64" class="uk-icon-link" uk-icon="github"></a>
-				<a href="https://github.com/64/mordhub" class="uk-icon-link" uk-icon="git-fork"></a>		
+				<a href="https://github.com/64/mordhub">Contribute to MordHub</a> &middot;
+				<a href="https://github.com/64">Created by Matt Taylor</a> &middot;
+				Copyright 2019
 			</p>
 		</div>
 	</footer>
