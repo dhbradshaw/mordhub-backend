@@ -102,12 +102,12 @@ impl ResponseError for Error {
                 .unwrap_or_else(|_| HttpResponse::NotFound().into())
             }
 
-            Error::RedirectToLogin => dbg!(HttpResponse::Found()
+            Error::RedirectToLogin => HttpResponse::Found()
                 .header("Location", "/auth/login")
-                .finish()),
+                .finish(),
 
             #[cfg(debug_assertions)]
-            Error::Database(e) => HttpResponse::InternalServerError().body(e.to_string()),
+            x @ Error::Database(_) => HttpResponse::InternalServerError().body(x.to_string()),
 
             #[cfg(debug_assertions)]
             Error::Template(e) => HttpResponse::InternalServerError().body(e.to_string()),

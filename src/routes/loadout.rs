@@ -1,5 +1,5 @@
 use crate::app::{self, PageTitle, State};
-use crate::models::{image::NewImage, loadout::NewLoadout, Image, Loadout, User};
+use crate::models::{Image, LoadoutMultiple, LoadoutSingle, NewImage, NewLoadout, User};
 use actix_web::{web, HttpResponse};
 use diesel::prelude::*;
 use futures::Future;
@@ -17,8 +17,9 @@ pub fn list(
     state: web::Data<State>,
 ) -> impl Future<Item = HttpResponse, Error = app::Error> {
     let state2 = state.clone();
+    let user2 = user.clone();
 
-    web::block(move || Loadout::query_multiple(&state.get_conn()).map_err(app::Error::from))
+    web::block(move || LoadoutMultiple::query(user2, &state.get_conn()).map_err(app::Error::from))
         .from_err()
         .and_then(move |ldts| {
             let mut ctx = State::tera_context(PageTitle::LoadoutList, user);
@@ -104,7 +105,7 @@ pub fn single(
     let user2 = user.clone();
 
     let loadout_future = web::block(move || {
-        Loadout::query_single(ld_id as i32, user2, &state.get_conn()).map_err(app::Error::db_or_404)
+        LoadoutSingle::query(ld_id as i32, user2, &state.get_conn()).map_err(app::Error::db_or_404)
     })
     .from_err();
 
@@ -120,12 +121,12 @@ pub fn single(
     .from_err();
 
     // Run queries in parallel
-    images_future
-        .join(loadout_future)
-        .and_then(move |(images, loadout): (Vec<Image>, Loadout)| {
+    images_future.join(loadout_future).and_then(
+        move |(images, loadout): (Vec<Image>, LoadoutSingle)| {
             let mut ctx = State::tera_context(PageTitle::LoadoutSingle(loadout.name.clone()), user);
             ctx.insert("loadout", &loadout);
             ctx.insert("images", &images);
             state3.render("loadouts/single.html", ctx)
-        })
+        },
+    )
 }

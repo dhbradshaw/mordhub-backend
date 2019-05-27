@@ -47,8 +47,6 @@ fn main() {
             reqwest: Client::new(), // TODO: Initialise TLS
         };
 
-        crate::models::loadout::LoadoutBetter::query_multiple(&state.get_conn());
-
         App::new()
             .data(state)
             .wrap(middleware::Logger::default())

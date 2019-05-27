@@ -1,11 +1,11 @@
 pub mod user;
-pub use user::User;
+pub use user::{NewUser, User};
 
 pub mod loadout;
-pub use loadout::Loadout;
+pub use loadout::{LoadoutMultiple, LoadoutSingle, NewLoadout};
 
 pub mod image;
-pub use image::Image;
+pub use image::{Image, NewImage};
 
 pub mod like;
-pub use like::Like;
+pub use like::{Like, NewLike};
