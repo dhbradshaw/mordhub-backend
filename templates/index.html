@@ -1,31 +1,56 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<title>{% block page_title %}Mordhub{% endblock %}</title>
+	<title>{% if page_title %}{{ page_title }} | {% endif %}MordHub</title>
+
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+	<!-- UIkit CSS -->
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/uikit/3.1.5/css/uikit.min.css" />
+
+	<!-- UIkit JS -->
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/uikit/3.1.5/js/uikit.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/uikit/3.1.5/js/uikit-icons.min.js"></script> 
 </head>
 
 <body>
-	<h1>{% block header %}Welcome to Mordhub{% endblock %}</h1>
+	<header class="uk-box-shadow-small" style="background-color: white">
+		<div class="uk-container uk-container-expand">
+			<nav class="uk-navbar" id="navbar" data-uk-navbar>
 
-	{% if user %}
-		<p>You are logged in as: {{ user.steam_id }}</p>
-		<a href="/auth/logout">Log out</a>
-	{% else %}
-		<a href="/auth/login">
-			<img src="https://steamcommunity-a.akamaihd.net/public/images/signinthroughsteam/sits_01.png"/>
-		</a>
-	{% endif %}
+			{% block nav %}
+				<div class="uk-navbar-left">
+					<a class="uk-navbar-item uk-logo" href="#">MordHub</a>
+				</div>
+					
+				<div class="uk-navbar-right">
+					<ul class="uk-navbar-nav uk-visible@m">
+						<li class="{% if page_type is streq("Home") %}uk-active{% endif %}"><a href="/">Home</a></li>
+						<li class="{% if page_type is streq("Loadouts") %}uk-active{% endif %}"><a href="/loadouts">Loadouts</a></li>
+						<li class="{% if page_type is streq("About") %}uk-active{% endif %}"><a href="/about">About</a></li>
+						{% if user %}
+							<li class="uk-active"><a href="/users/{{ user.steam_id }}">{{ user.id }}</a></li>
+							<li><a href="/auth/logout">Log out</a></li>
+						{% else %}
+							<li><a href="/auth/login">
+								<img src="https://steamcommunity-a.akamaihd.net/public/images/signinthroughsteam/sits_01.png"/>
+							</a><li>
+						{% endif %}
+					</ul>
+				</div>
+			{% endblock %}
+			</nav>
+		</div>
+	</header>
 
-	<div id="nav">
-	{% block nav %}
-		<a href="/">Home</a>
-		<a href="/loadouts">Loadouts</a>
-	{% endblock %}
-	</div>
+	<section class="uk-section"> 
+		<div class="uk-container uk-container-small">
+			<h1 class="uk-heading-primary">{{ page_title }}</h1>
 
-	<div id="content">
-	{% block content %}
-	{% endblock %}
-	</div>
+			{% block content %}
+			{% endblock %}
+		</div>
+	</section>
 </body>
 </html>

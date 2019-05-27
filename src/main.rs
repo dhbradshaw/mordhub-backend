@@ -12,13 +12,13 @@ mod models;
 mod routes;
 mod schema;
 
+use actix_files as fs;
 use actix_web::{
     cookie::SameSite,
     guard, middleware,
     middleware::identity::{CookieIdentityPolicy, IdentityService},
     web, App, HttpResponse, HttpServer, ResponseError,
 };
-use actix_files as fs;
 use diesel::{r2d2::ConnectionManager, PgConnection};
 use dotenv::dotenv;
 use reqwest::r#async::Client;
@@ -29,7 +29,7 @@ fn main() {
     dotenv().ok();
     env_logger::init();
 
-    let system = actix_rt::System::new("Mordhub");
+    let system = actix_rt::System::new("MordHub");
 
     let db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let manager = ConnectionManager::<PgConnection>::new(db_url);
@@ -38,7 +38,8 @@ fn main() {
         .expect("failed to create db pool");
 
     HttpServer::new(move || {
-        let tera = tera::Tera::new("templates/**/*").expect("failed to compile templates");
+        let mut tera = tera::Tera::new("templates/**/*").expect("failed to compile templates");
+        tera.register_tester("streq", app::tera_streq);
 
         let state = app::State {
             pool: pool.clone(),
@@ -59,8 +60,9 @@ fn main() {
                 .same_site(SameSite::Lax) // CSRF mitigation (TODO: add form token mitigation as well)
                 .secure(false), // TODO: Use TLS and make this true
             ))
-            // Index
-            .route("/", web::get().to(routes::index::index))
+            // Meta
+            .route("/", web::get().to(routes::meta::index))
+            .route("/about", web::get().to(routes::meta::about))
             // Auth
             .route("/auth/login", web::get().to(routes::auth::login))
             .route("/auth/logout", web::get().to(routes::auth::logout))
@@ -69,7 +71,10 @@ fn main() {
                 web::get().to_async(routes::auth::callback),
             )
             // User
-            .route("/users/{id}", web::get().to(routes::user::user_profile))
+            .route(
+                "/users/{id}",
+                web::get().to_async(routes::user::user_profile),
+            )
             // Loadouts
             .route("/loadouts", web::get().to_async(routes::loadout::list))
             .route(
@@ -85,11 +90,11 @@ fn main() {
                 web::get().to_async(routes::loadout::single),
             )
             // Static files
-            .service(fs::Files::new("/static", "./static/"))
+            .service(fs::Files::new("/static", "./static/").index_file("404.html"))
             // 404
             .default_service(
                 web::resource("")
-                    .route(web::get().to(|| app::Error::NotFound.error_response()))
+                    .route(web::get().to(|| app::Error::NotFound.render_response()))
                     .route(
                         web::route()
                             .guard(guard::Not(guard::Get()))

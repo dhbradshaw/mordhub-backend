@@ -1,4 +1,4 @@
-use crate::app::{self, State};
+use crate::app::{self, PageTitle, State};
 use crate::models::{image::NewImage, loadout::NewLoadout, Image, Loadout, User};
 use actix_web::{web, HttpResponse};
 use diesel::prelude::*;
@@ -21,7 +21,7 @@ pub fn list(
     web::block(move || Loadout::query_multiple(&state.get_conn()).map_err(app::Error::from))
         .from_err()
         .and_then(move |ldts| {
-            let mut ctx = State::tera_with_user(user);
+            let mut ctx = State::tera_context(PageTitle::LoadoutList, user);
             ctx.insert("loadouts", &ldts);
             state2.render("loadouts/list.html", ctx)
         })
@@ -32,7 +32,7 @@ pub fn create_get(user: Option<User>, state: web::Data<State>) -> Result<HttpRes
         return Err(app::Error::RedirectToLogin);
     }
 
-    let ctx = State::tera_with_user(user);
+    let ctx = State::tera_context(PageTitle::LoadoutCreate, user);
 
     state.render("loadouts/create.html", ctx)
 }
@@ -123,7 +123,7 @@ pub fn single(
     images_future
         .join(loadout_future)
         .and_then(move |(images, loadout): (Vec<Image>, Loadout)| {
-            let mut ctx = State::tera_with_user(user);
+            let mut ctx = State::tera_context(PageTitle::LoadoutSingle(loadout.name.clone()), user);
             ctx.insert("loadout", &loadout);
             ctx.insert("images", &images);
             state3.render("loadouts/single.html", ctx)
