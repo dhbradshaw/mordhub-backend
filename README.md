@@ -11,3 +11,4 @@ TO DO:
 [ ] Mod ideas page
 [ ] `aria-x` screen reader assist
 [ ] Get license from KickOff
+[ ] Color thief

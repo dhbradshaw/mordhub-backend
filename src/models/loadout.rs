@@ -2,6 +2,7 @@ use crate::models::User;
 use crate::schema::loadouts;
 use chrono::naive::NaiveDateTime;
 use diesel::prelude::*;
+use diesel::sql_types::*;
 
 // TODO: There's FAR too much repetition of field types, names etc.
 
@@ -135,5 +136,38 @@ impl From<LoadoutWithLikes> for Loadout {
             like_count: l.like_count.map(|i| i as u64).unwrap_or(0),
             has_liked: false,
         }
+    }
+}
+
+#[derive(Debug, Clone, QueryableByName)]
+pub struct LoadoutBetter {
+    #[sql_type = "Integer"]
+    pub id: i32,
+    #[sql_type = "Integer"]
+    pub user_id: i32,
+    #[sql_type = "Varchar"]
+    pub name: String,
+    #[sql_type = "Varchar"]
+    pub data: String,
+    #[sql_type = "Timestamp"]
+    pub created_at: NaiveDateTime,
+    #[sql_type = "BigInt"]
+    pub like_count: i64,
+    #[sql_type = "Bool"]
+    pub has_liked: bool, // Whether the current user has already liked this loadout
+    #[sql_type = "Varchar"]
+    pub main_image_url: String,
+}
+
+impl LoadoutBetter {
+    pub fn query_multiple(conn: &PgConnection) -> Result<Vec<Self>, diesel::result::Error> {
+        dbg!(diesel::sql_query(
+            "SELECT \
+                loadouts.*, \
+                (SELECT COUNT(*) FROM likes WHERE likes.loadout_id = loadouts.id) as like_count, \
+                EXISTS (SELECT user_id FROM likes WHERE user_id = 1) AS has_liked, \
+                (SELECT url FROM images WHERE images.loadout_id = loadouts.id AND images.position = 0) as main_image_url \
+            FROM loadouts")
+            .load(conn))
     }
 }

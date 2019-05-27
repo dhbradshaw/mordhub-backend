@@ -89,17 +89,10 @@ pub enum Error {
 
 impl ResponseError for Error {
     fn error_response(&self) -> HttpResponse {
-        match self {
-            Error::NotFound => HttpResponse::NotFound().into(),
-            Error::RedirectToLogin => HttpResponse::Found().into(),
-            _ => HttpResponse::InternalServerError().into(),
-        }
-    }
-
-    fn render_response(&self) -> HttpResponse {
         #[allow(unreachable_patterns)]
         match self {
             Error::NotFound => {
+                // TODO: Pre-cache this in memory
                 let f = File::open("static/404.html");
                 f.and_then(|mut f| {
                     let mut s = String::new();
@@ -127,6 +120,10 @@ impl ResponseError for Error {
             // TODO: Render a nice HTML file instead in release
             _ => HttpResponse::InternalServerError().body("Unknown internal server error"),
         }
+    }
+
+    fn render_response(&self) -> HttpResponse {
+        self.error_response()
     }
 }
 
