@@ -79,7 +79,7 @@ pub enum VerifyError {
 }
 
 pub fn login() -> HttpResponse {
-    let openid = OpenIdAuth::new("http://localhost:3000".to_owned());
+    let openid = OpenIdAuth::new(std::env::var("SITE_URL").expect("SITE_URL is not set"));
 
     let qs = match serde_urlencoded::to_string(&openid) {
         Ok(qs) => qs,
