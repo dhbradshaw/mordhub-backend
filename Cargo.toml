@@ -3,9 +3,13 @@ name = "mordhub"
 version = "0.1.0"
 authors = ["Matt Taylor <mstaveleytaylor@gmail.com>"]
 edition = "2018"
+build = "build.rs"
 
 [workspace]
 exclude = ["vendor/*"]
+
+[build-dependencies]
+pulldown-cmark = { version = "0.5", default-features = false, features = ["simd"] }
 
 [dependencies]
 actix-web = "1.0.0-rc"
@@ -28,3 +32,4 @@ actix-rt = "0.2.2"
 url = "1.7.2"
 failure = "0.1.5"
 actix-files = "0.1.0"
+mordhau-loadout-parser = "0.1.0"

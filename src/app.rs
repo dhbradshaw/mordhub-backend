@@ -22,6 +22,8 @@ pub enum PageTitle {
     LoadoutCreate,
     LoadoutSingle(String),
     User(String),
+    GuideList,
+    GuideSingle(&'static str),
     About,
 }
 
@@ -44,6 +46,8 @@ impl State {
             PageTitle::LoadoutSingle(s) => ("Loadouts", s),
             PageTitle::User(s) => ("User", s),
             PageTitle::About => ("About", "About".to_string()),
+            PageTitle::GuideList => ("Guides", "Guides".to_string()),
+            PageTitle::GuideSingle(s) => ("Guides", s.to_string()),
         };
 
         ctx.insert("page_type", page_type);

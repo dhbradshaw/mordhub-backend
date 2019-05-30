@@ -29,6 +29,7 @@
 					<ul class="uk-subnav" data-uk-margin>
 						<li class="uk-visible@s {% if page_type is streq("Home") %}uk-active{% endif %}"><a href="/">Home</a></li>
 						<li class="uk-visible@s {% if page_type is streq("Loadouts") %}uk-active{% endif %}"><a href="/loadouts">Loadouts</a></li>
+						<li class="uk-visible@s {% if page_type is streq("Guides") %}uk-active{% endif %}"><a href="/guides">Guides</a></li>
 						<li class="uk-visible@s {% if page_type is streq("About") %}uk-active{% endif %}"><a href="/about">About</a></li>
 						{% if user %}
 							<li class="uk-visible@s uk-active"><a href="/users/{{ user.steam_id }}">{{ user.id }}</a></li>

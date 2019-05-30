@@ -1,3 +1,4 @@
 /target
+templates/**/gen
 **/*.rs.bk
 .env
