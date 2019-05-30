@@ -25,7 +25,7 @@ STEAM_API_KEY=STEAMAPIKEYHERE
 COOKIE_SECRET=Ur6FvHby2XJ8THRNdnUD8bFaS6GFsw2p
 SITE_URL=http://localhost:3000
 ```
-Replace `DBPASSWORD` and `STEAMAPIKEYHERE` as appropriate. The cookie secret doesn't matter much if you're just testing the server, but in production it should be a totally random 32-byte string.
+Replace `DBPASSWORD` and `STEAMAPIKEYHERE` as appropriate. The cookie secret doesn't matter much if you're just testing the server, but in production it should be a totally random 32-byte string. On Linux, if you created a user with a different username to `postgres`, then edit the `DATABASE_URL` accordingly (e.g `postgres://myuser:mypass@localhost/mordhub`).
 
 10. Finish database creation with `diesel setup` inside the project root.
 
