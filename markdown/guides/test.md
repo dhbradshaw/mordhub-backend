@@ -1,1 +1,1 @@
-Hello world! ~~foo~~ bar
+Hello world! ~~foo~~ bar **baz**
