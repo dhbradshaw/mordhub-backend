@@ -92,6 +92,8 @@ fn main() {
             // Guides
             .route("/guides", web::get().to(routes::guides::list))
             .route("/guides/{guide}", web::get().to(routes::guides::single))
+            // API
+            .route("/api/test", web::get().to(routes::api::test))
             // Static files
             .service(fs::Files::new("/static", "./static/").index_file("404.html"))
             // 404
