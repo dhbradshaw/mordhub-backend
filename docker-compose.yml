@@ -1,0 +1,25 @@
+version: '3'
+services:
+  mordhub-backend:
+    build: .
+    env_file: .env
+    environment:
+      - WAIT_HOSTS=postgres:5432
+    networks:
+      - backend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+  postgres:
+    image: "postgres:alpine"
+    environment:
+      - POSTGRES_DB=mordhub
+    env_file: .env
+    networks:
+      - backend
+    ports:
+      - "5432:5432"
+
+networks:
+  backend:

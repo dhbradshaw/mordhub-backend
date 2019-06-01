@@ -8,6 +8,10 @@ use std::{
 // Compile markdown files in the markdown folder into tera templates in the templates folder
 
 fn main() -> io::Result<()> {
+    if std::env::var("SKIP_BUILDRS").unwrap_or("0".to_string()) == "1" {
+        return Ok(());
+    }
+
     let mut options = Options::empty();
     options.insert(Options::ENABLE_STRIKETHROUGH);
 
