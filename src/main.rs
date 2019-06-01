@@ -107,9 +107,11 @@ fn main() {
                     ),
             )
     })
-    .bind("localhost:3000")
-    .expect("can't bind to localhost:3000")
+    .bind("0.0.0.0:3000")
+    .expect("can't bind to 0.0.0.0:3000")
     .start();
+
+    println!("Starting server on 0.0.0.0:3000");
 
     system.run().expect("system run error");
 }

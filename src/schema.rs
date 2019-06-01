@@ -38,4 +38,9 @@ joinable!(likes -> loadouts (loadout_id));
 joinable!(likes -> users (user_id));
 joinable!(loadouts -> users (user_id));
 
-allow_tables_to_appear_in_same_query!(images, likes, loadouts, users,);
+allow_tables_to_appear_in_same_query!(
+    images,
+    likes,
+    loadouts,
+    users,
+);
