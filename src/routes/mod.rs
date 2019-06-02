@@ -4,3 +4,4 @@ pub mod guides;
 pub mod loadout;
 pub mod meta;
 pub mod user;
+pub mod gen;

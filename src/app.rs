@@ -1,5 +1,6 @@
 use crate::models::User;
 use actix_web::{error::BlockingError, HttpResponse, ResponseError};
+use askama::Template;
 use diesel::{
     r2d2::{ConnectionManager, Pool, PooledConnection},
     PgConnection,
@@ -7,24 +8,33 @@ use diesel::{
 use reqwest::r#async::Client;
 use std::fs::File;
 use std::io::Read;
-use tera::{Context, Tera, Value};
 
 pub struct State {
     pub pool: Pool<ConnectionManager<PgConnection>>,
-    pub tera: Tera,
     pub reqwest: Client,
 }
 
 #[derive(Debug, Clone)]
-pub enum PageTitle {
+pub enum ActiveLink {
     Home,
-    LoadoutList,
-    LoadoutCreate,
-    LoadoutSingle(String),
-    User(String),
-    GuideList,
-    GuideSingle(&'static str),
+    Loadouts,
+    Guides,
     About,
+    None,
+}
+
+pub struct TmplBase {
+    pub user: Option<User>,
+    pub active_link: ActiveLink,
+}
+
+impl TmplBase {
+    pub fn new(user: Option<User>, al: ActiveLink) -> Self {
+        Self {
+            user,
+            active_link: al,
+        }
+    }
 }
 
 impl State {
@@ -32,47 +42,12 @@ impl State {
         self.pool.get().unwrap()
     }
 
-    pub fn tera_context(page: PageTitle, user: Option<User>) -> Context {
-        let mut ctx = Context::new();
-
-        if let Some(user) = user {
-            ctx.insert("user", &user);
-        }
-
-        let (page_type, page_title) = match page {
-            PageTitle::Home => ("Home", "Home".to_string()),
-            PageTitle::LoadoutList => ("Loadouts", "Loadouts".to_string()),
-            PageTitle::LoadoutCreate => ("Loadouts", "Create Loadout".to_string()),
-            PageTitle::LoadoutSingle(s) => ("Loadouts", s),
-            PageTitle::User(s) => ("User", s),
-            PageTitle::About => ("About", "About".to_string()),
-            PageTitle::GuideList => ("Guides", "Guides".to_string()),
-            PageTitle::GuideSingle(s) => ("Guides", s.to_string()),
-        };
-
-        ctx.insert("page_type", page_type);
-        ctx.insert("page_title", &page_title);
-
-        ctx
-    }
-
-    pub fn render(&self, tmpl: &'static str, ctx: Context) -> Result<HttpResponse, Error> {
-        match self.tera.render(tmpl, ctx) {
+    pub fn render<T: Template>(ctx: T) -> Result<HttpResponse, Error> {
+        match ctx.render() {
             Ok(s) => Ok(HttpResponse::Ok().content_type("text/html").body(s)),
-            Err(e) => Err(crate::app::Error::Template(format!("{:?}", e))),
+            Err(e) => Err(crate::app::Error::Template(e)),
         }
     }
-}
-
-pub fn tera_streq(value: Option<&Value>, args: &[Value]) -> Result<bool, tera::Error> {
-    let value = value
-        .and_then(Value::as_str)
-        .expect("streq test provided with no value");
-    let other = args
-        .first()
-        .and_then(Value::as_str)
-        .expect("streq test provided with no argument");
-    Ok(value == other)
 }
 
 #[derive(Debug, Fail)]
@@ -80,7 +55,7 @@ pub enum Error {
     #[fail(display = "database error: {}", _0)]
     Database(diesel::result::Error),
     #[fail(display = "template error: {}", _0)]
-    Template(String),
+    Template(askama::Error),
     #[fail(display = "canceled block")]
     CanceledBlock,
     #[fail(display = "404 not found")]

@@ -1,6 +1,5 @@
-use crate::app::{self, PageTitle, State};
-use crate::models::User;
-use actix_web::{web::Json, HttpResponse};
+use crate::app;
+use actix_web::web::Json;
 
 #[derive(Serialize)]
 pub struct TestResponse {

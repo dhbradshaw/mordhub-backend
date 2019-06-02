@@ -1,13 +1,28 @@
-use crate::app::{self, PageTitle, State};
+use crate::app::{self, ActiveLink, State, TmplBase};
 use crate::models::User;
-use actix_web::{web, HttpResponse};
+use actix_web::HttpResponse;
+use askama::Template;
 
-pub fn index(user: Option<User>, state: web::Data<State>) -> Result<HttpResponse, app::Error> {
-    let ctx = State::tera_context(PageTitle::Home, user);
-    state.render("index.html", ctx)
+#[derive(Template)]
+#[template(path = "index.html")]
+struct Index {
+    base: TmplBase,
 }
 
-pub fn about(user: Option<User>, state: web::Data<State>) -> Result<HttpResponse, app::Error> {
-    let ctx = State::tera_context(PageTitle::About, user);
-    state.render("about.html", ctx)
+pub fn index(user: Option<User>) -> Result<HttpResponse, app::Error> {
+    State::render(Index {
+        base: TmplBase::new(user, ActiveLink::Home),
+    })
+}
+
+#[derive(Template)]
+#[template(path = "about.html")]
+struct About {
+    base: TmplBase,
+}
+
+pub fn about(user: Option<User>) -> Result<HttpResponse, app::Error> {
+    State::render(About {
+        base: TmplBase::new(user, ActiveLink::About),
+    })
 }

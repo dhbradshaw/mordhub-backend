@@ -1,16 +1,22 @@
-use crate::app::{self, PageTitle, State};
+use crate::app::{self, ActiveLink, State, TmplBase};
 use crate::models::{user::SteamId, User};
 use actix_web::{web, HttpResponse};
+use askama::Template;
 use diesel::prelude::*;
 use futures::Future;
+
+#[derive(Template)]
+#[template(path = "user.html")]
+struct UserProfile {
+    base: TmplBase,
+    target: User,
+}
 
 pub fn user_profile(
     user_id: web::Path<SteamId>,
     user: Option<User>,
     state: web::Data<State>,
 ) -> impl Future<Item = HttpResponse, Error = app::Error> {
-    let state2 = state.clone();
-
     web::block(move || {
         use crate::schema::users::dsl::*;
 
@@ -20,9 +26,10 @@ pub fn user_profile(
             .map_err(app::Error::db_or_404)
     })
     .from_err()
-    .and_then(move |target_user| {
-        let mut ctx = State::tera_context(PageTitle::User(target_user.steam_id.to_string()), user);
-        ctx.insert("target", &target_user);
-        state2.render("user.html", ctx)
+    .and_then(move |target| {
+        State::render(UserProfile {
+            base: TmplBase::new(user, ActiveLink::None),
+            target,
+        })
     })
 }

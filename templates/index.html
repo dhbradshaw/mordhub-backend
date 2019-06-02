@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<title>{% if page_title %}{{ page_title }} | {% endif %}MordHub</title>
+	<title>{% block page_title %}MordHub{% endblock %}</title>
 
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -27,18 +27,19 @@
 				<div class="uk-width-expand"></div>
 				<div class="uk-width-auto">
 					<ul class="uk-subnav" data-uk-margin>
-						<li class="uk-visible@s {% if page_type is streq("Home") %}uk-active{% endif %}"><a href="/">Home</a></li>
-						<li class="uk-visible@s {% if page_type is streq("Loadouts") %}uk-active{% endif %}"><a href="/loadouts">Loadouts</a></li>
-						<li class="uk-visible@s {% if page_type is streq("Guides") %}uk-active{% endif %}"><a href="/guides">Guides</a></li>
-						<li class="uk-visible@s {% if page_type is streq("About") %}uk-active{% endif %}"><a href="/about">About</a></li>
-						{% if user %}
-							<li class="uk-visible@s uk-active"><a href="/users/{{ user.steam_id }}">{{ user.id }}</a></li>
-							<li class="uk-visible@s"><a href="/auth/logout">Log out</a></li>
-						{% else %}
-							<li class="uk-visible@s"><a href="/auth/login">
-								<img src="https://steamcommunity-a.akamaihd.net/public/images/signinthroughsteam/sits_01.png"/>
-							</a><li class="uk-visible@s">
-						{% endif %}
+						<li class="uk-visible@s{% match base.active_link %}{% when ActiveLink::Home %} uk-active{% else %}{% endmatch %}"><a href="/">Home</a></li>
+						<li class="uk-visible@s{% match base.active_link %}{% when ActiveLink::Loadouts %} uk-active{% else %}{% endmatch %}"><a href="/loadouts">Loadouts</a></li>
+						<li class="uk-visible@s{% match base.active_link %}{% when ActiveLink::Guides %} uk-active{% else %}{% endmatch %}"><a href="/guides">Guides</a></li>
+						<li class="uk-visible@s{% match base.active_link %}{% when ActiveLink::About %} uk-active{% else %}{% endmatch %}"><a href="/about">About</a></li>
+						{% match base.user %}
+							{% when Some with (user) %}
+								<li class="uk-visible@s uk-active"><a href="/users/{{ user.steam_id }}">{{ user.id }}</a></li>
+								<li class="uk-visible@s"><a href="/auth/logout">Log out</a></li>
+							{% when None %}
+								<li class="uk-visible@s"><a href="/auth/login">
+									<img src="https://steamcommunity-a.akamaihd.net/public/images/signinthroughsteam/sits_01.png"/>
+								</a><li class="uk-visible@s">
+						{% endmatch %}
 					</ul>
 				</div>
 			</div>
@@ -50,7 +51,6 @@
 	{% block outer_content %}
 	<section class="uk-section"> 
 		<div class="uk-container uk-container-small">
-			<h1 class="uk-heading-primary">{{ page_title }}</h1>
 			{% block content %}
 			{% endblock content %}
 		</div>

@@ -38,12 +38,8 @@ fn main() {
         .expect("failed to create db pool");
 
     HttpServer::new(move || {
-        let mut tera = tera::Tera::new("templates/**/*").expect("failed to compile templates");
-        tera.register_tester("streq", app::tera_streq);
-
         let state = app::State {
             pool: pool.clone(),
-            tera,
             reqwest: Client::new(), // TODO: Initialise TLS
         };
 
@@ -91,7 +87,7 @@ fn main() {
             )
             // Guides
             .route("/guides", web::get().to(routes::guides::list))
-            .route("/guides/{guide}", web::get().to(routes::guides::single))
+            .service(routes::gen::guides::scope())
             // API
             .route("/api/test", web::get().to(routes::api::test))
             // Static files

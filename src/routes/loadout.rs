@@ -1,6 +1,7 @@
-use crate::app::{self, PageTitle, State};
+use crate::app::{self, ActiveLink, State, TmplBase};
 use crate::models::{Image, LoadoutMultiple, LoadoutSingle, NewImage, NewLoadout, User};
 use actix_web::{web, HttpResponse};
+use askama::Template;
 use diesel::prelude::*;
 use futures::Future;
 
@@ -12,30 +13,43 @@ pub struct CreateLoadout {
     cloudinary_format: String,
 }
 
+#[derive(Template)]
+#[template(path = "loadouts/list.html")]
+struct LoadoutList {
+    base: TmplBase,
+    loadouts: Vec<LoadoutMultiple>,
+}
+
 pub fn list(
     user: Option<User>,
     state: web::Data<State>,
 ) -> impl Future<Item = HttpResponse, Error = app::Error> {
-    let state2 = state.clone();
     let user2 = user.clone();
 
     web::block(move || LoadoutMultiple::query(user2, &state.get_conn()).map_err(app::Error::from))
         .from_err()
-        .and_then(move |ldts| {
-            let mut ctx = State::tera_context(PageTitle::LoadoutList, user);
-            ctx.insert("loadouts", &ldts);
-            state2.render("loadouts/list.html", ctx)
+        .and_then(move |loadouts| {
+            State::render(LoadoutList {
+                base: TmplBase::new(user, ActiveLink::Loadouts),
+                loadouts,
+            })
         })
 }
 
-pub fn create_get(user: Option<User>, state: web::Data<State>) -> Result<HttpResponse, app::Error> {
+#[derive(Template)]
+#[template(path = "loadouts/create.html")]
+struct LoadoutCreate {
+    base: TmplBase,
+}
+
+pub fn create_get(user: Option<User>) -> Result<HttpResponse, app::Error> {
     if user.is_none() {
         return Err(app::Error::RedirectToLogin);
     }
 
-    let ctx = State::tera_context(PageTitle::LoadoutCreate, user);
-
-    state.render("loadouts/create.html", ctx)
+    State::render(LoadoutCreate {
+        base: TmplBase::new(user, ActiveLink::Loadouts),
+    })
 }
 
 pub fn create_post(
@@ -94,13 +108,20 @@ pub fn create_post(
     })
 }
 
+#[derive(Template)]
+#[template(path = "loadouts/single.html")]
+struct LoadoutSingleTmpl {
+    base: TmplBase,
+    loadout: LoadoutSingle,
+    images: Vec<Image>,
+}
+
 pub fn single(
     ld_id: web::Path<u32>,
     user: Option<User>,
     state: web::Data<State>,
 ) -> impl Future<Item = HttpResponse, Error = app::Error> {
     let state2 = state.clone();
-    let state3 = state.clone();
     let ld_id = *ld_id;
     let user2 = user.clone();
 
@@ -123,10 +144,11 @@ pub fn single(
     // Run queries in parallel
     images_future.join(loadout_future).and_then(
         move |(images, loadout): (Vec<Image>, LoadoutSingle)| {
-            let mut ctx = State::tera_context(PageTitle::LoadoutSingle(loadout.name.clone()), user);
-            ctx.insert("loadout", &loadout);
-            ctx.insert("images", &images);
-            state3.render("loadouts/single.html", ctx)
+            State::render(LoadoutSingleTmpl {
+                base: TmplBase::new(user, ActiveLink::Loadouts),
+                loadout,
+                images,
+            })
         },
     )
 }
