@@ -61,7 +61,8 @@ Replace `DBPASSWORD` and `STEAMAPIKEYHERE` as appropriate. The cookie secret doe
 12. Celebrate with a glass of champagne.
 
 ## TODO
-- [ ] Switch to Askama templating engine
+- [ ] Continuous Integration with Travis CI
+- [x] Switch to Askama templating engine
 - [ ] Pagination
 - [x] Image upload
 - [ ] Clean up routes/auth.rs and models/loadout.rs
