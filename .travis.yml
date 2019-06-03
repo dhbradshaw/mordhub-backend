@@ -10,8 +10,7 @@ install:
   - echo "SITE_URL=http://localhost:3000" >> .env
 
 script:
-  - docker-compose up
-  - ./biosoftware | while read line; do echo "$line" | grep -q "Starting server on" && killall docker-compose; done
+  - docker-compose up | while read line; do echo "$line" | grep -q "Starting server on" && killall docker-compose; done
 
 # TODO: Push to docker hub?
 # TODO: Run tests
