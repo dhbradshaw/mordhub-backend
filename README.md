@@ -1,5 +1,7 @@
 # MordHub
 
+[![Build Status](https://travis-ci.org/mordhub/mordhub-backend.svg?branch=master)](https://travis-ci.org/mordhub/mordhub-backend)
+
 ## Building and Running
 
 ### Docker
@@ -23,7 +25,7 @@ Next, install [`docker`](https://docs.docker.com/install/) and [`docker-compose`
 ```
 docker-compose up
 ```
-from the project root. It may take about 10 minutes to compile from scratch, and uses about ~3GB of disk space at the time of writing (1.7GB for the rust install, 1.2GB for the dependencies and build artifacts of the project itself).
+from the project root. It may take about 10 minutes to compile from scratch, and uses about ~3GB of disk space at the time of writing (1.7GB for the rust install, 1.2GB for the dependencies and build artifacts of the project itself). The Postgres username and password are the same as the example `.env` file shown above.
 
 Also make sure to stop any local postgres services you might be running as docker will complain about port 5432 being used.
 
