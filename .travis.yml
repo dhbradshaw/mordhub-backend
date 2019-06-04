@@ -14,9 +14,7 @@ install:
   - echo "SITE_URL=http://localhost:3000" >> .env
 
 script:
-  - docker-compose up --abort-on-container-exit | while read line; do echo "$line" | rg --passthru "Starting server on" && killall docker-compose; done
+  - docker-compose up --abort-on-container-exit | while read line || exit 0; do echo "$line" | rg --passthru "Starting server on" && killall docker-compose; done
 
 # TODO: Push to docker hub?
 # TODO: Run tests
-# TODO: Quit when it actually errors
-# TODO: Fix 'not found' markdown error
