@@ -1,5 +1,5 @@
 pub mod user;
-pub use user::{NewUser, User};
+pub use user::User;
 
 pub mod loadout;
 pub use loadout::{LoadoutMultiple, LoadoutSingle, NewLoadout};

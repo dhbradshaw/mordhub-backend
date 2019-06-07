@@ -1,51 +1,38 @@
-use crate::models::{user::SteamId, User};
-use crate::schema::loadouts;
+use crate::{
+    app::{self, PgPool},
+    models::{user::SteamId, User},
+};
 use chrono::naive::NaiveDateTime;
-use diesel::prelude::*;
-use diesel::sql_types::*;
+use futures::{
+    future::{self, Either, Future},
+    stream::Stream,
+};
 
-#[derive(Debug, Clone, Serialize, QueryableByName)]
+#[derive(Debug, Clone, Serialize)]
 pub struct LoadoutSingle {
-    #[sql_type = "Integer"]
     pub id: i32,
-    #[sql_type = "Integer"]
     pub user_id: i32,
-    #[sql_type = "Varchar"]
     pub name: String,
-    #[sql_type = "Varchar"]
     pub data: String,
-    #[sql_type = "Timestamp"]
     pub created_at: NaiveDateTime,
-    #[sql_type = "BigInt"]
     pub like_count: i64,
-    #[sql_type = "Bool"]
     pub has_liked: bool, // Whether the current user has already liked this loadout
 }
 
-#[derive(Debug, Clone, QueryableByName, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct LoadoutMultiple {
-    #[sql_type = "Integer"]
     pub id: i32,
-    #[sql_type = "Integer"]
     pub user_id: i32,
-    #[sql_type = "Varchar"]
     pub name: String,
-    #[sql_type = "Varchar"]
     pub data: String,
-    #[sql_type = "Timestamp"]
     pub created_at: NaiveDateTime,
-    #[sql_type = "BigInt"]
     pub like_count: i64,
-    #[sql_type = "Bool"]
     pub has_liked: bool, // Whether the current user has already liked this loadout
-    #[sql_type = "Varchar"]
     pub main_image_url: String,
-    #[sql_type = "BigInt"]
     pub user_steam_id: SteamId,
 }
 
-#[derive(Debug, Clone, Insertable)]
-#[table_name = "loadouts"]
+#[derive(Debug, Clone)]
 pub struct NewLoadout {
     pub user_id: i32,
     pub name: String,
@@ -53,32 +40,32 @@ pub struct NewLoadout {
 }
 
 impl LoadoutMultiple {
-    pub fn query(
-        user: Option<User>,
-        conn: &PgConnection,
-    ) -> Result<Vec<Self>, diesel::result::Error> {
-        if let Some(user) = user {
-            diesel::sql_query(
-                "SELECT loadouts.*, \
-                    (SELECT COUNT(*) FROM likes WHERE likes.loadout_id = loadouts.id) as like_count, \
-                    EXISTS (SELECT user_id FROM likes WHERE user_id = $1) AS has_liked, \
-                    (SELECT steam_id FROM users WHERE users.id = loadouts.user_id) as user_steam_id, \
-                    (SELECT url FROM images WHERE images.loadout_id = loadouts.id AND images.position = 0) as main_image_url \
-                FROM loadouts"
-            )
-                .bind::<Integer, _>(user.id)
-                .get_results(conn)
-        } else {
-            diesel::sql_query(
-                "SELECT loadouts.*, \
-                    (SELECT COUNT(*) FROM likes WHERE likes.loadout_id = loadouts.id) as like_count, \
-                    (SELECT steam_id FROM users WHERE users.id = loadouts.user_id) as user_steam_id, \
-                    (SELECT url FROM images WHERE images.loadout_id = loadouts.id AND images.position = 0) as main_image_url \
-                FROM loadouts"
-            )
-                .get_results::<Self>(conn)
-                .map(|res| res.into_iter().map(|mut r| { r.has_liked = false; r }).collect())
-        }
+    pub fn query(user: Option<User>, conn: &PgPool) -> Result<Vec<Self>, tokio_postgres::Error> {
+        Ok(vec![])
+        // if let Some(user) = user {
+        //     diesel::sql_query(
+        //         "SELECT loadouts.*, \
+        //             (SELECT COUNT(*) FROM likes WHERE likes.loadout_id = loadouts.id)
+        // as like_count, \             EXISTS (SELECT user_id FROM likes WHERE
+        // user_id = $1) AS has_liked, \             (SELECT steam_id FROM users
+        // WHERE users.id = loadouts.user_id) as user_steam_id, \
+        // (SELECT url FROM images WHERE images.loadout_id = loadouts.id AND
+        // images.position = 0) as main_image_url \         FROM loadouts"
+        //     )
+        //         .bind::<Integer, _>(user.id)
+        //         .get_results(conn)
+        // } else {
+        //     diesel::sql_query(
+        //         "SELECT loadouts.*, \
+        //             (SELECT COUNT(*) FROM likes WHERE likes.loadout_id = loadouts.id)
+        // as like_count, \             (SELECT steam_id FROM users WHERE
+        // users.id = loadouts.user_id) as user_steam_id, \             (SELECT
+        // url FROM images WHERE images.loadout_id = loadouts.id AND images.position =
+        // 0) as main_image_url \         FROM loadouts"
+        //     )
+        //         .get_results::<Self>(conn)
+        //         .map(|res| res.into_iter().map(|mut r| { r.has_liked = false; r
+        // }).collect()) }
     }
 }
 
@@ -86,32 +73,68 @@ impl LoadoutSingle {
     pub fn query(
         id: i32,
         user: Option<User>,
-        conn: &PgConnection,
-    ) -> Result<Self, diesel::result::Error> {
-        if let Some(user) = user {
-            diesel::sql_query(
-                "SELECT loadouts.*, \
-                 (SELECT COUNT(*) FROM likes WHERE likes.loadout_id = loadouts.id) as like_count, \
-                 EXISTS (SELECT user_id FROM likes WHERE user_id = $1) AS has_liked \
-                 FROM loadouts \
-                 WHERE loadouts.id = $2",
-            )
-            .bind::<Integer, _>(user.id)
-            .bind::<Integer, _>(id)
-            .get_result::<Self>(conn)
-        } else {
-            diesel::sql_query(
-                "SELECT loadouts.*, \
-                 (SELECT COUNT(*) FROM likes WHERE likes.loadout_id = loadouts.id) as like_count \
-                 FROM loadouts \
-                 WHERE loadouts.id = $1",
-            )
-            .bind::<Integer, _>(id)
-            .get_result::<Self>(conn)
-            .map(|mut r| {
-                r.has_liked = false;
-                r
-            })
-        }
+        pool: &PgPool,
+    ) -> impl Future<Item = Self, Error = app::Error> {
+        pool.run(move |mut conn| {
+            if let Some(user) = user {
+                Either::A(conn.prepare(
+                    "SELECT (id, user_id, name, data, created_at), \
+                    (SELECT COUNT(*) FROM likes WHERE likes.loadout_id = loadouts.id) as like_count, \
+                    EXISTS (SELECT user_id FROM likes WHERE user_id = $1) AS has_liked \
+                    FROM loadouts \
+                    WHERE loadouts.id = $2"
+                ).then(move |r| match r {
+                    Ok(statement) => {
+                        Either::A(
+                            conn.query(&statement, &[&user.id, &id]).into_future().then(move |r| match r {
+                                Ok((Some(row), _)) => {
+                                    Ok((Self {
+                                        id: row.get(0),
+                                        user_id: row.get(1),
+                                        name: row.get(2),
+                                        data: row.get(3),
+                                        created_at: row.get(4),
+                                        like_count: row.get(5),
+                                        has_liked: row.get(6)
+                                    }, conn))
+                                },
+                                Ok((None, _)) => Err((app::Error::NotFound, conn)),
+                                Err((e, _)) => Err((app::Error::from(e), conn))
+                            })
+                        )
+                    },
+                    Err(e) => Either::B(future::err((app::Error::from(e), conn)))
+                }))
+            } else {
+                Either::B(conn.prepare(
+                    "SELECT loadouts.*, \
+                    (SELECT COUNT(*) FROM likes WHERE likes.loadout_id = loadouts.id) as like_count \
+                    FROM loadouts \
+                    WHERE loadouts.id = $1",
+                ).then(move |r| match r {
+                    Ok(statement) => {
+                        Either::A(
+                            conn.query(&statement, &[&id]).into_future().then(move |r| match r {
+                                Ok((Some(row), _)) => {
+                                    Ok((Self {
+                                        id: row.get(0),
+                                        user_id: row.get(1),
+                                        name: row.get(2),
+                                        data: row.get(3),
+                                        created_at: row.get(4),
+                                        like_count: row.get(5),
+                                        has_liked: false,
+                                    }, conn))
+                                },
+                                Ok((None, _)) => Err((app::Error::NotFound, conn)),
+                                Err((e, _)) => Err((app::Error::from(e), conn))
+                            })
+                        )
+                    },
+                    Err(e) => Either::B(future::err((app::Error::from(e), conn)))
+                }))
+            }
+        })
+        .from_err()
     }
 }

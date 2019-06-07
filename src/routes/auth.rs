@@ -1,7 +1,13 @@
-use crate::app::State;
-use crate::models::user::{NewUser, SteamId};
-use actix_web::{error::BlockingError, middleware::identity::Identity, web, Error, HttpResponse};
-use futures::{Future, Stream};
+use crate::{
+    app::{self, State},
+    models::user::SteamId,
+};
+use actix_web::{middleware::identity::Identity, web, Error, HttpResponse};
+use futures::{
+    future::{self, Either},
+    Future,
+    Stream,
+};
 use url::Url;
 
 const STEAM_URL: &str = "https://steamcommunity.com/openid/login";
@@ -74,8 +80,14 @@ pub enum VerifyError {
     Deserialize,
     Invalid,
     SteamId,
-    Db(diesel::result::Error),
-    Interrupted,
+    Db(tokio_postgres::Error),
+    DbTimeout,
+}
+
+impl From<tokio_postgres::Error> for VerifyError {
+    fn from(e: tokio_postgres::Error) -> Self {
+        VerifyError::Db(e)
+    }
 }
 
 pub fn login() -> HttpResponse {
@@ -150,23 +162,26 @@ pub fn callback(
                 .parse::<SteamId>()
                 .map_err(|_| VerifyError::SteamId)
         })
-        .and_then(|steam_id| {
-            web::block(move || {
-                use crate::diesel::RunQueryDsl;
-                use crate::schema::users;
-
-                let new_user = NewUser { steam_id };
-
-                diesel::insert_into(users::table)
-                    .values(&new_user)
-                    .on_conflict_do_nothing()
-                    .execute(&state.get_conn())
-                    .map(|_| steam_id)
-            })
-            .map_err(|e| match e {
-                BlockingError::Error(dbe) => VerifyError::Db(dbe),
-                _ => VerifyError::Interrupted,
-            })
+        .and_then(move |steam_id| {
+            state
+                .get_db()
+                .run(move |mut conn| {
+                    conn.prepare("INSERT INTO users (steam_id) VALUES ($1) ON CONFLICT DO NOTHING")
+                        .then(move |r| match r {
+                            Ok(statement) => Either::A(
+                                conn.execute(&statement, &[&steam_id.as_i64()])
+                                    .then(move |r| match r {
+                                        Ok(_) => Ok((steam_id, conn)),
+                                        Err(e) => Err((VerifyError::Db(e), conn)),
+                                    }),
+                            ),
+                            Err(e) => Either::B(future::err((VerifyError::Db(e), conn))),
+                        })
+                })
+                .map_err(|e| match e {
+                    bb8::RunError::User(e) => e,
+                    _ => VerifyError::DbTimeout,
+                })
         })
         .and_then(move |steam_id| {
             debug!("Verified user {}", steam_id);

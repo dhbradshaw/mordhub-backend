@@ -1,30 +1,34 @@
 #[macro_use]
-extern crate diesel;
-#[macro_use]
 extern crate log;
 #[macro_use]
 extern crate serde;
 #[macro_use]
 extern crate failure;
+#[macro_use]
+extern crate lazy_static;
 
 mod app;
 mod models;
 mod routes;
-mod schema;
 
 use actix_files as fs;
 use actix_web::{
     cookie::SameSite,
-    guard, middleware,
-    middleware::identity::{CookieIdentityPolicy, IdentityService},
-    web, App, HttpResponse, HttpServer, ResponseError,
+    guard,
+    middleware::{
+        self,
+        identity::{CookieIdentityPolicy, IdentityService},
+    },
+    web,
+    App,
+    HttpResponse,
+    HttpServer,
+    ResponseError,
 };
-use diesel::{r2d2::ConnectionManager, PgConnection};
 use dotenv::dotenv;
-use reqwest::r#async::Client;
 
 fn main() {
-    std::env::set_var("RUST_LOG", "mordhub=debug,actix_web=info");
+    std::env::set_var("RUST_LOG", "mordhub=debug,actix_web=error");
 
     dotenv().ok();
     env_logger::init();
@@ -32,16 +36,9 @@ fn main() {
     let system = actix_rt::System::new("MordHub");
 
     let db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let manager = ConnectionManager::<PgConnection>::new(db_url);
-    let pool = r2d2::Pool::builder()
-        .build(manager)
-        .expect("failed to create db pool");
 
     HttpServer::new(move || {
-        let state = app::State {
-            pool: pool.clone(),
-            reqwest: Client::new(), // TODO: Initialise TLS
-        };
+        let state = app::State::new(&db_url);
 
         App::new()
             .data(state)

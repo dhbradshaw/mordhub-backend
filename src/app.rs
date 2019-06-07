@@ -1,17 +1,36 @@
 use crate::models::User;
 use actix_web::{error::BlockingError, HttpResponse, ResponseError};
 use askama::Template;
-use diesel::{
-    r2d2::{ConnectionManager, Pool, PooledConnection},
-    PgConnection,
-};
+use futures::Future;
 use reqwest::r#async::Client;
-use std::fs::File;
-use std::io::Read;
+use std::{fs::File, io::Read, sync::Mutex};
+
+pub type PgPool = bb8::Pool<bb8_postgres::PostgresConnectionManager<tokio_postgres::NoTls>>;
+
+lazy_static! {
+    static ref POOL: Mutex<Option<PgPool>> = { Mutex::new(None) };
+}
+
+fn get_pool(db_url: &str) -> PgPool {
+    let mut pool = POOL.lock().unwrap();
+
+    if pool.is_none() {
+        let pg_mgr = bb8_postgres::PostgresConnectionManager::new(db_url, tokio_postgres::NoTls);
+
+        let built_pool = bb8::Pool::builder()
+            .build(pg_mgr)
+            .wait()
+            .expect("db connection error");
+
+        pool.replace(built_pool);
+    }
+
+    pool.as_ref().unwrap().clone()
+}
 
 pub struct State {
-    pub pool: Pool<ConnectionManager<PgConnection>>,
-    pub reqwest: Client,
+    pool: PgPool,
+    pub reqwest: reqwest::r#async::Client,
 }
 
 #[derive(Debug, Clone)]
@@ -38,8 +57,15 @@ impl TmplBase {
 }
 
 impl State {
-    pub fn get_conn(&self) -> PooledConnection<ConnectionManager<PgConnection>> {
-        self.pool.get().unwrap()
+    pub fn new(db_url: &str) -> Self {
+        Self {
+            pool: get_pool(db_url),
+            reqwest: Client::new(),
+        }
+    }
+
+    pub fn get_db(&self) -> &PgPool {
+        &self.pool
     }
 
     pub fn render<T: Template>(ctx: T) -> Result<HttpResponse, Error> {
@@ -53,7 +79,9 @@ impl State {
 #[derive(Debug, Fail)]
 pub enum Error {
     #[fail(display = "database error: {}", _0)]
-    Database(diesel::result::Error),
+    Database(tokio_postgres::Error),
+    #[fail(display = "database connection timed out")]
+    DatabaseTimedOut,
     #[fail(display = "template error: {}", _0)]
     Template(askama::Error),
     #[fail(display = "canceled block")]
@@ -64,6 +92,8 @@ pub enum Error {
     Unauthorized,
     #[fail(display = "unauthorized - redirecting to login")]
     RedirectToLogin,
+    #[fail(display = "unknown internal server error")]
+    Internal,
 }
 
 impl ResponseError for Error {
@@ -86,13 +116,13 @@ impl ResponseError for Error {
                 .finish(),
 
             #[cfg(debug_assertions)]
-            x @ Error::Database(_) => HttpResponse::InternalServerError().body(x.to_string()),
-
-            #[cfg(debug_assertions)]
             Error::Template(e) => HttpResponse::InternalServerError().body(e.to_string()),
 
             #[cfg(debug_assertions)]
-            x @ Error::CanceledBlock | x @ Error::Unauthorized => {
+            x @ Error::CanceledBlock
+            | x @ Error::Unauthorized
+            | x @ Error::Database(_)
+            | x @ Error::DatabaseTimedOut => {
                 HttpResponse::InternalServerError().body(x.to_string())
             }
 
@@ -121,16 +151,34 @@ impl From<BlockingError<Error>> for Error {
     }
 }
 
-impl From<diesel::result::Error> for Error {
-    fn from(e: diesel::result::Error) -> Self {
+impl From<tokio_postgres::Error> for Error {
+    fn from(e: tokio_postgres::Error) -> Self {
         Error::Database(e)
     }
 }
 
-impl Error {
-    pub fn db_or_404(e: diesel::result::Error) -> Self {
+impl From<bb8::RunError<tokio_postgres::Error>> for Error {
+    fn from(e: bb8::RunError<tokio_postgres::Error>) -> Self {
         match e {
-            diesel::result::Error::NotFound => Error::NotFound,
+            bb8::RunError::User(e) => Error::from(e),
+            _ => Error::DatabaseTimedOut,
+        }
+    }
+}
+
+impl From<bb8::RunError<Error>> for Error {
+    fn from(e: bb8::RunError<Self>) -> Self {
+        match e {
+            bb8::RunError::User(e) => e,
+            _ => Error::DatabaseTimedOut,
+        }
+    }
+}
+
+impl Error {
+    pub fn db_or_404(e: tokio_postgres::Error) -> Self {
+        match e.code() {
+            // Some(tokio_postgres::error::SqlState::NO_DATA_FOUND) => Error::NotFound,
             _ => Error::Database(e),
         }
     }

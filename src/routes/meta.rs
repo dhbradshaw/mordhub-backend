@@ -1,5 +1,7 @@
-use crate::app::{self, ActiveLink, State, TmplBase};
-use crate::models::User;
+use crate::{
+    app::{self, ActiveLink, State, TmplBase},
+    models::User,
+};
 use actix_web::HttpResponse;
 use askama::Template;
 
