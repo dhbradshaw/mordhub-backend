@@ -75,66 +75,45 @@ impl LoadoutSingle {
         user: Option<User>,
         pool: &PgPool,
     ) -> impl Future<Item = Self, Error = app::Error> {
-        pool.run(move |mut conn| {
+        pool.connection().and_then(|mut conn| {
             if let Some(user) = user {
-                Either::A(conn.prepare(
+                Either::A(conn.client.prepare(
                     "SELECT (id, user_id, name, data, created_at), \
                     (SELECT COUNT(*) FROM likes WHERE likes.loadout_id = loadouts.id) as like_count, \
                     EXISTS (SELECT user_id FROM likes WHERE user_id = $1) AS has_liked \
                     FROM loadouts \
                     WHERE loadouts.id = $2"
-                ).then(move |r| match r {
-                    Ok(statement) => {
-                        Either::A(
-                            conn.query(&statement, &[&user.id, &id]).into_future().then(move |r| match r {
-                                Ok((Some(row), _)) => {
-                                    Ok((Self {
-                                        id: row.get(0),
-                                        user_id: row.get(1),
-                                        name: row.get(2),
-                                        data: row.get(3),
-                                        created_at: row.get(4),
-                                        like_count: row.get(5),
-                                        has_liked: row.get(6)
-                                    }, conn))
-                                },
-                                Ok((None, _)) => Err((app::Error::NotFound, conn)),
-                                Err((e, _)) => Err((app::Error::from(e), conn))
-                            })
-                        )
-                    },
-                    Err(e) => Either::B(future::err((app::Error::from(e), conn)))
-                }))
+                ).map_err(|e| l337::Error::External(e))
+                .map(move |row| (conn, row, user.id)))
             } else {
-                Either::B(conn.prepare(
+                Either::B(conn.client.prepare(
                     "SELECT loadouts.*, \
                     (SELECT COUNT(*) FROM likes WHERE likes.loadout_id = loadouts.id) as like_count \
                     FROM loadouts \
-                    WHERE loadouts.id = $1",
-                ).then(move |r| match r {
-                    Ok(statement) => {
-                        Either::A(
-                            conn.query(&statement, &[&id]).into_future().then(move |r| match r {
-                                Ok((Some(row), _)) => {
-                                    Ok((Self {
-                                        id: row.get(0),
-                                        user_id: row.get(1),
-                                        name: row.get(2),
-                                        data: row.get(3),
-                                        created_at: row.get(4),
-                                        like_count: row.get(5),
-                                        has_liked: false,
-                                    }, conn))
-                                },
-                                Ok((None, _)) => Err((app::Error::NotFound, conn)),
-                                Err((e, _)) => Err((app::Error::from(e), conn))
-                            })
-                        )
-                    },
-                    Err(e) => Either::B(future::err((app::Error::from(e), conn)))
-                }))
+                    WHERE loadouts.id = $1"
+                ).map_err(|e| l337::Error::External(e))
+                .map(|row| (conn, row, 0)))
             }
         })
         .from_err()
+        .and_then(move |(mut conn, statement, user_id)| {
+            conn.client.query(&statement, &[&user_id, &id])
+                .into_future()
+                .map(|(r, _)| r)
+                .map_err(|(e, _)| e)
+                .from_err()
+        })
+        .and_then(|row| match row {
+            Some(row) => Ok(LoadoutSingle {
+                id: row.get(0),
+                user_id: row.get(1),
+                name: row.get(2),
+                data: row.get(3),
+                created_at: row.get(4),
+                like_count: row.get(5),
+                has_liked: row.get(6)
+            }),
+            None => Err(app::Error::NotFound)
+        })
     }
 }

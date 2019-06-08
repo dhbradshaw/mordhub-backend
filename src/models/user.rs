@@ -1,11 +1,6 @@
 use crate::app::{self, PgPool, State};
 use actix_web::{dev::Payload, middleware::identity::Identity, web, FromRequest, HttpRequest};
-use futures::{
-    future::{self, Either},
-    stream::Stream,
-    Future,
-    IntoFuture,
-};
+use futures::{stream::Stream, Future, IntoFuture};
 use std::str::FromStr;
 use tokio_postgres::types::{FromSql, Type};
 
@@ -72,29 +67,27 @@ impl User {
         steam_id: SteamId,
         pool: &PgPool,
     ) -> impl Future<Item = User, Error = app::Error> {
-        pool.run(move |mut conn| {
-            conn.prepare("SELECT id, steam_id FROM users WHERE steam_id = $1")
-                .then(move |r| match r {
-                    Ok(statement) => Either::A(
-                        conn.query(&statement, &[&steam_id.as_i64()])
+        pool.connection()
+            .and_then(move |mut conn| {
+                conn.client
+                    .prepare("SELECT id, steam_id FROM users WHERE steam_id = $1")
+                    .and_then(move |statement| {
+                        conn.client
+                            .query(&statement, &[&steam_id.as_i64()])
                             .into_future()
-                            .then(move |r| match r {
-                                Ok((Some(row), _)) => Ok((
-                                    User {
-                                        id: row.get(0),
-                                        steam_id: row.get(1),
-                                    },
-                                    conn,
-                                )),
-                                // No user found in database - TODO: redirect to login?
-                                Ok((None, _)) => Err((app::Error::Unauthorized, conn)),
-                                Err((e, _)) => Err((app::Error::from(e), conn)),
-                            }),
-                    ),
-                    Err(e) => Either::B(future::err((app::Error::from(e), conn))),
-                })
-        })
-        .from_err()
+                            .map(|(r, _)| r)
+                            .map_err(|(e, _)| e)
+                    })
+                    .map_err(|e| l337::Error::External(e))
+            })
+            .from_err()
+            .and_then(|row| match row {
+                Some(row) => Ok(User {
+                    id: row.get(0),
+                    steam_id: row.get(1),
+                }),
+                None => Err(app::Error::Unauthorized),
+            })
     }
 }
 

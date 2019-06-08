@@ -3,11 +3,7 @@ use crate::{
     models::user::SteamId,
 };
 use actix_web::{middleware::identity::Identity, web, Error, HttpResponse};
-use futures::{
-    future::{self, Either},
-    Future,
-    Stream,
-};
+use futures::{Future, Stream};
 use url::Url;
 
 const STEAM_URL: &str = "https://steamcommunity.com/openid/login";
@@ -165,21 +161,19 @@ pub fn callback(
         .and_then(move |steam_id| {
             state
                 .get_db()
-                .run(move |mut conn| {
-                    conn.prepare("INSERT INTO users (steam_id) VALUES ($1) ON CONFLICT DO NOTHING")
-                        .then(move |r| match r {
-                            Ok(statement) => Either::A(
-                                conn.execute(&statement, &[&steam_id.as_i64()])
-                                    .then(move |r| match r {
-                                        Ok(_) => Ok((steam_id, conn)),
-                                        Err(e) => Err((VerifyError::Db(e), conn)),
-                                    }),
-                            ),
-                            Err(e) => Either::B(future::err((VerifyError::Db(e), conn))),
+                .connection()
+                .and_then(move |mut conn| {
+                    conn.client
+                        .prepare("INSERT INTO users (steam_id) VALUES ($1) ON CONFLICT DO NOTHING")
+                        .and_then(move |statement| {
+                            conn.client
+                                .execute(&statement, &[&steam_id.as_i64()])
+                                .map(move |_| steam_id)
                         })
+                        .map_err(|e| l337::Error::External(e))
                 })
                 .map_err(|e| match e {
-                    bb8::RunError::User(e) => e,
+                    l337::Error::External(e) => VerifyError::Db(e),
                     _ => VerifyError::DbTimeout,
                 })
         })

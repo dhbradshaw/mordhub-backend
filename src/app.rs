@@ -5,27 +5,28 @@ use futures::Future;
 use reqwest::r#async::Client;
 use std::{fs::File, io::Read, sync::Mutex};
 
-pub type PgPool = bb8::Pool<bb8_postgres::PostgresConnectionManager<tokio_postgres::NoTls>>;
+pub type PgPool = l337::Pool<l337_postgres::PostgresConnectionManager<tokio_postgres::NoTls>>;
 
 lazy_static! {
-    static ref POOL: Mutex<Option<PgPool>> = { Mutex::new(None) };
-}
+    static ref POOL: Mutex<PgPool> = {
+        let db_cfg = std::env::var("DATABASE_URL")
+            .unwrap()
+            .parse()
+            .expect("failed to parse db url");
 
-fn get_pool(db_url: &str) -> PgPool {
-    let mut pool = POOL.lock().unwrap();
+        let mgr = l337_postgres::PostgresConnectionManager::new(db_cfg, tokio_postgres::NoTls);
 
-    if pool.is_none() {
-        let pg_mgr = bb8_postgres::PostgresConnectionManager::new(db_url, tokio_postgres::NoTls);
+        let pool_cfg = l337::Config {
+            min_size: 1,
+            max_size: 1,
+        };
 
-        let built_pool = bb8::Pool::builder()
-            .build(pg_mgr)
-            .wait()
-            .expect("db connection error");
-
-        pool.replace(built_pool);
-    }
-
-    pool.as_ref().unwrap().clone()
+        Mutex::new(
+            l337::Pool::new(mgr, pool_cfg)
+                .wait()
+                .expect("db connection error"),
+        )
+    };
 }
 
 pub struct State {
@@ -57,9 +58,10 @@ impl TmplBase {
 }
 
 impl State {
-    pub fn new(db_url: &str) -> Self {
+    pub fn new(_db_url: &str) -> Self {
         Self {
-            pool: get_pool(db_url),
+            // DB URL is passed through env var
+            pool: POOL.lock().unwrap().clone(),
             reqwest: Client::new(),
         }
     }
@@ -157,19 +159,19 @@ impl From<tokio_postgres::Error> for Error {
     }
 }
 
-impl From<bb8::RunError<tokio_postgres::Error>> for Error {
-    fn from(e: bb8::RunError<tokio_postgres::Error>) -> Self {
+impl From<l337::Error<tokio_postgres::Error>> for Error {
+    fn from(e: l337::Error<tokio_postgres::Error>) -> Self {
         match e {
-            bb8::RunError::User(e) => Error::from(e),
+            l337::Error::External(e) => Error::from(e),
             _ => Error::DatabaseTimedOut,
         }
     }
 }
 
-impl From<bb8::RunError<Error>> for Error {
-    fn from(e: bb8::RunError<Self>) -> Self {
+impl From<l337::Error<Self>> for Error {
+    fn from(e: l337::Error<Self>) -> Self {
         match e {
-            bb8::RunError::User(e) => e,
+            l337::Error::External(e) => e,
             _ => Error::DatabaseTimedOut,
         }
     }
