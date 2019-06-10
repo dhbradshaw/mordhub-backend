@@ -4,9 +4,3 @@ pub struct Like {
     pub user_id: i32,
     pub loadout_id: i32,
 }
-
-#[derive(Debug)]
-pub struct NewLike {
-    pub user_id: i32,
-    pub loadout_id: i32,
-}

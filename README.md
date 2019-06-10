@@ -78,3 +78,5 @@ Replace `DBPASSWORD` and `STEAMAPIKEYHERE` as appropriate. The cookie secret doe
 - [ ] Search function
 - [ ] Team loadouts
 - [ ] Return Options in DB functions
+- [ ] Parallelize queries in LoadoutSingle
+- [ ] Better handling of `l337` errors

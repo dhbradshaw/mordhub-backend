@@ -19,16 +19,11 @@ pub fn user_profile(
     state: web::Data<State>,
 ) -> impl Future<Item = HttpResponse, Error = app::Error> {
     User::get_by_steam_id(*user_id, state.get_db())
-        .from_err()
-        .and_then(move |target: User| {
+        .and_then(|target| target.ok_or(app::Error::NotFound))
+        .and_then(move |target| {
             State::render(UserProfile {
                 base: TmplBase::new(user, ActiveLink::None),
                 target,
             })
-        })
-        .map_err(|e| match e {
-            // TODO: Have get_by_steam_id return option instead?
-            app::Error::Unauthorized => app::Error::NotFound,
-            _ => e,
         })
 }

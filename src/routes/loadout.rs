@@ -1,10 +1,10 @@
 use crate::{
     app::{self, ActiveLink, State, TmplBase},
-    models::{Image, LoadoutMultiple, LoadoutSingle, NewImage, NewLoadout, User},
+    models::{Image, LoadoutMultiple, LoadoutSingle, User},
 };
 use actix_web::{web, HttpResponse};
 use askama::Template;
-use futures::Future;
+use futures::{stream::Stream, Future};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct CreateLoadout {
@@ -66,45 +66,48 @@ pub fn create_post(
     );
 
     let user_id = user.id;
-    let state_2 = state.clone();
 
-    web::block(move || {
-        let new_loadout = NewLoadout {
-            user_id,
-            name: form.name.clone(),
-            data: form.data.clone(),
-        };
-
-        // diesel::insert_into(loadouts::table)
-        //     .values(&new_loadout)
-        //     .returning(loadouts::id)
-        //     .get_result::<i32>(state.get_db())
-        //     .map_err(app::Error::from)
-        Err(app::Error::NotFound)
-    })
-    .from_err()
-    .and_then(move |loadout_id: i32| {
-        web::block(move || {
-            let new_image = NewImage {
-                url: cloudinary_url,
-                loadout_id,
-                position: 0,
-            };
-
-            // diesel::insert_into(images::table)
-            //     .values(&new_image)
-            //     .execute(state_2.clone().get_db())
-            //     .map_err(app::Error::from)
-            //     .map(|_| loadout_id)
-            Err(app::Error::NotFound)
+    state.get_db()
+        .connection()
+        .and_then(|mut conn| {
+            conn.client.prepare(
+                "INSERT INTO loadouts (user_id, name, data, created_at) VALUES ($1, $2, $3, DEFAULT) RETURNING id"
+            )
+                .map_err(l337::Error::External)
+                .map(|statement| (conn, statement))
         })
-    })
-    .from_err()
-    .and_then(|id: i32| {
-        Ok(HttpResponse::SeeOther()
-            .header("Location", format!("/loadouts/{}", id))
-            .finish())
-    })
+        .from_err()
+        .and_then(move |(mut conn, statement)|
+            conn.client.query(&statement, &[&user_id, &form.name, &form.data])
+                .into_future()
+                .map_err(|(e, _)| e)
+                .map(|(r, _)| (conn, r))
+                .from_err()
+        )
+        .and_then(|(conn, row)| match row {
+            Some(row) => Ok((conn, row.get(0))),
+            None => Err(app::Error::DbNothingReturned),
+        })
+        .and_then(move |(mut conn, loadout_id): (_, i32)| {
+            conn.client.prepare(
+                "INSERT INTO images (url, loadout_id, position) VALUES ($1, $2, $3)"
+            )
+                .map(move |statement| (conn, loadout_id, statement))
+                .from_err()
+        })
+        .and_then(move |(mut conn, loadout_id, statement)|
+            // TODO: Position
+            conn.client.query(&statement, &[&cloudinary_url, &loadout_id, &0i32])
+                .into_future()
+                .map_err(|(e, _)| e)
+                .map(move |_| loadout_id)
+                .from_err()
+        )
+        .and_then(|loadout_id| {
+            Ok(HttpResponse::SeeOther()
+                .header("Location", format!("/loadouts/{}", loadout_id))
+                .finish())
+        })
 }
 
 #[derive(Template)]
@@ -120,17 +123,12 @@ pub fn single(
     user: Option<User>,
     state: web::Data<State>,
 ) -> impl Future<Item = HttpResponse, Error = app::Error> {
-    let loadout_future = LoadoutSingle::query(*ld_id as i32, user.clone(), state.get_db());
+    // TODO: Optimise to use just one connection
 
-    let images_future = web::block(move || {
-        // images
-        //     .filter(loadout_id.eq(ld_id as i32))
-        //     .order_by(position)
-        //     .load::<Image>(state2.get_db())
-        //     .map_err(app::Error::from)
-        Err(app::Error::NotFound)
-    })
-    .from_err();
+    let loadout_future = LoadoutSingle::query(*ld_id as i32, user.clone(), state.get_db())
+        .and_then(|ldt| ldt.ok_or(app::Error::NotFound));
+
+    let images_future = Image::query(*ld_id as i32, state.get_db());
 
     // Run queries in parallel
     images_future.join(loadout_future).and_then(

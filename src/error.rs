@@ -15,6 +15,8 @@ pub enum Error {
     Unauthorized,
     #[fail(display = "unknown internal error")]
     Internal,
+    #[fail(display = "nothing returned from database")]
+    DbNothingReturned,
     #[fail(display = "unauthorized - redirecting to login")]
     RedirectToLogin,
 }

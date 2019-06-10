@@ -66,7 +66,7 @@ impl User {
     pub fn get_by_steam_id(
         steam_id: SteamId,
         pool: &PgPool,
-    ) -> impl Future<Item = User, Error = app::Error> {
+    ) -> impl Future<Item = Option<User>, Error = app::Error> {
         pool.connection()
             .and_then(move |mut conn| {
                 conn.client
@@ -78,15 +78,14 @@ impl User {
                             .map(|(r, _)| r)
                             .map_err(|(e, _)| e)
                     })
-                    .map_err(|e| l337::Error::External(e))
+                    .map_err(l337::Error::External)
             })
             .from_err()
-            .and_then(|row| match row {
-                Some(row) => Ok(User {
+            .and_then(|row| {
+                Ok(row.map(|row| User {
                     id: row.get(0),
                     steam_id: row.get(1),
-                }),
-                None => Err(app::Error::Unauthorized),
+                }))
             })
     }
 }
@@ -117,7 +116,8 @@ impl FromRequest for User {
         Box::new(
             SteamId::from_request(req, payload)
                 .into_future()
-                .and_then(move |steam_id| User::get_by_steam_id(steam_id, state.get_db())),
+                .and_then(move |steam_id| User::get_by_steam_id(steam_id, state.get_db()))
+                .and_then(|user| user.ok_or(app::Error::Unauthorized)),
         )
     }
 }

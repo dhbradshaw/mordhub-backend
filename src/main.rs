@@ -4,8 +4,6 @@ extern crate log;
 extern crate serde;
 #[macro_use]
 extern crate failure;
-#[macro_use]
-extern crate lazy_static;
 
 mod app;
 mod error;
@@ -37,8 +35,6 @@ fn main() {
 
     let mut system = actix_rt::System::new("MordHub");
 
-    let db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-
     let db_cfg = std::env::var("DATABASE_URL")
         .unwrap()
         .parse()
@@ -47,8 +43,8 @@ fn main() {
     let mgr = l337_postgres::PostgresConnectionManager::new(db_cfg, tokio_postgres::NoTls);
 
     let pool_cfg = l337::Config {
-        min_size: 1,
-        max_size: 1,
+        min_size: 4,
+        max_size: 32,
     };
 
     let pool = system
@@ -56,7 +52,7 @@ fn main() {
         .expect("db connection error");
 
     HttpServer::new(move || {
-        let state = app::State::new(&db_url, pool.clone());
+        let state = app::State::new(pool.clone());
 
         App::new()
             .data(state)

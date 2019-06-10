@@ -1,7 +1,6 @@
-use crate::{files, models::User};
+use crate::models::User;
 use actix_web::HttpResponse;
 use askama::Template;
-use futures::Future;
 use reqwest::r#async::Client;
 
 pub use crate::error::Error;
@@ -37,9 +36,8 @@ impl TmplBase {
 }
 
 impl State {
-    pub fn new(db_url: &str, pool: PgPool) -> Self {
+    pub fn new(pool: PgPool) -> Self {
         Self {
-            // DB URL is passed through env var
             pool: pool,
             reqwest: Client::new(),
         }
@@ -52,7 +50,7 @@ impl State {
     pub fn render<T: Template>(ctx: T) -> Result<HttpResponse, Error> {
         match ctx.render() {
             Ok(s) => Ok(HttpResponse::Ok().content_type("text/html").body(s)),
-            Err(e) => Err(crate::app::Error::Template(e)),
+            Err(e) => Err(Error::Template(e)),
         }
     }
 }
