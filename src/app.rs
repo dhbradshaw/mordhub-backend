@@ -7,28 +7,6 @@ use std::{fs::File, io::Read, sync::Mutex};
 
 pub type PgPool = l337::Pool<l337_postgres::PostgresConnectionManager<tokio_postgres::NoTls>>;
 
-lazy_static! {
-    static ref POOL: Mutex<PgPool> = {
-        let db_cfg = std::env::var("DATABASE_URL")
-            .unwrap()
-            .parse()
-            .expect("failed to parse db url");
-
-        let mgr = l337_postgres::PostgresConnectionManager::new(db_cfg, tokio_postgres::NoTls);
-
-        let pool_cfg = l337::Config {
-            min_size: 1,
-            max_size: 1,
-        };
-
-        Mutex::new(
-            l337::Pool::new(mgr, pool_cfg)
-                .wait()
-                .expect("db connection error"),
-        )
-    };
-}
-
 pub struct State {
     pool: PgPool,
     pub reqwest: reqwest::r#async::Client,
@@ -58,10 +36,10 @@ impl TmplBase {
 }
 
 impl State {
-    pub fn new(_db_url: &str) -> Self {
+    pub fn new(db_url: &str, pool: PgPool) -> Self {
         Self {
             // DB URL is passed through env var
-            pool: POOL.lock().unwrap().clone(),
+            pool: pool,
             reqwest: Client::new(),
         }
     }

@@ -33,12 +33,27 @@ fn main() {
     dotenv().ok();
     env_logger::init();
 
-    let system = actix_rt::System::new("MordHub");
+    let mut system = actix_rt::System::new("MordHub");
 
     let db_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
+    let db_cfg = std::env::var("DATABASE_URL")
+        .unwrap()
+        .parse()
+        .expect("failed to parse db url");
+
+    let mgr = l337_postgres::PostgresConnectionManager::new(db_cfg, tokio_postgres::NoTls);
+
+    let pool_cfg = l337::Config {
+        min_size: 1,
+        max_size: 1,
+    };
+
+    let pool = system.block_on(l337::Pool::new(mgr, pool_cfg))
+            .expect("db connection error");
+
     HttpServer::new(move || {
-        let state = app::State::new(&db_url);
+        let state = app::State::new(&db_url, pool.clone());
 
         App::new()
             .data(state)
