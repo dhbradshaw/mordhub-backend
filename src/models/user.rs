@@ -1,13 +1,21 @@
-use crate::app::State;
-use crate::schema::users;
+use crate::{app::State, schema::users};
 use actix_web::{
-    dev::Payload, error::BlockingError, http::StatusCode, middleware::identity::Identity, web,
-    FromRequest, HttpRequest, HttpResponse, ResponseError,
+    dev::Payload,
+    error::BlockingError,
+    http::StatusCode,
+    middleware::identity::Identity,
+    web,
+    FromRequest,
+    HttpRequest,
+    HttpResponse,
+    ResponseError,
 };
-use diesel::backend::Backend;
-use diesel::deserialize::{self, FromSql};
-use diesel::serialize::{self, Output, ToSql};
-use diesel::sql_types::*;
+use diesel::{
+    backend::Backend,
+    deserialize::{self, FromSql},
+    serialize::{self, Output, ToSql},
+    sql_types::*,
+};
 use futures::{Future, IntoFuture};
 use std::{io::Write, str::FromStr};
 
@@ -135,8 +143,10 @@ impl FromRequest for User {
                 .and_then(move |s_id| {
                     web::block(move || {
                         let user = {
-                            use crate::diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
-                            use crate::schema::users::dsl::*;
+                            use crate::{
+                                diesel::{ExpressionMethods, QueryDsl, RunQueryDsl},
+                                schema::users::dsl::*,
+                            };
                             users
                                 // TODO: Use user.id instead of user.steam_id?
                                 .filter(steam_id.eq(s_id))

@@ -8,6 +8,8 @@ extern crate serde;
 extern crate failure;
 
 mod app;
+mod error;
+mod files;
 mod models;
 mod routes;
 mod schema;
@@ -15,16 +17,23 @@ mod schema;
 use actix_files as fs;
 use actix_web::{
     cookie::SameSite,
-    guard, middleware,
-    middleware::identity::{CookieIdentityPolicy, IdentityService},
-    web, App, HttpResponse, HttpServer, ResponseError,
+    guard,
+    middleware::{
+        self,
+        identity::{CookieIdentityPolicy, IdentityService},
+    },
+    web,
+    App,
+    HttpResponse,
+    HttpServer,
+    ResponseError,
 };
 use diesel::{r2d2::ConnectionManager, PgConnection};
 use dotenv::dotenv;
 use reqwest::r#async::Client;
 
 fn main() {
-    std::env::set_var("RUST_LOG", "mordhub=debug,actix_web=info");
+    std::env::set_var("RUST_LOG", "mordhub=debug,actix_web=error");
 
     dotenv().ok();
     env_logger::init();

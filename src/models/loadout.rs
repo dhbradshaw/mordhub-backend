@@ -1,8 +1,9 @@
-use crate::models::{user::SteamId, User};
-use crate::schema::loadouts;
+use crate::{
+    models::{user::SteamId, User},
+    schema::loadouts,
+};
 use chrono::naive::NaiveDateTime;
-use diesel::prelude::*;
-use diesel::sql_types::*;
+use diesel::{prelude::*, sql_types::*};
 
 #[derive(Debug, Clone, Serialize, QueryableByName)]
 pub struct LoadoutSingle {

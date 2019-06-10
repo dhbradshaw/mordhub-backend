@@ -1,5 +1,7 @@
-use crate::app::{self, ActiveLink, State, TmplBase};
-use crate::models::{user::SteamId, User};
+use crate::{
+    app::{self, ActiveLink, State, TmplBase},
+    models::{user::SteamId, User},
+};
 use actix_web::{web, HttpResponse};
 use askama::Template;
 use diesel::prelude::*;

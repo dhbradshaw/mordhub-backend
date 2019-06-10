@@ -1,5 +1,7 @@
-use crate::app::{self, ActiveLink, State, TmplBase};
-use crate::models::{Image, LoadoutMultiple, LoadoutSingle, NewImage, NewLoadout, User};
+use crate::{
+    app::{self, ActiveLink, State, TmplBase},
+    models::{Image, LoadoutMultiple, LoadoutSingle, NewImage, NewLoadout, User},
+};
 use actix_web::{web, HttpResponse};
 use askama::Template;
 use diesel::prelude::*;

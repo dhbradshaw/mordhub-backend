@@ -1,5 +1,7 @@
-use crate::app::State;
-use crate::models::user::{NewUser, SteamId};
+use crate::{
+    app::State,
+    models::user::{NewUser, SteamId},
+};
 use actix_web::{error::BlockingError, middleware::identity::Identity, web, Error, HttpResponse};
 use futures::{Future, Stream};
 use url::Url;
@@ -152,8 +154,7 @@ pub fn callback(
         })
         .and_then(|steam_id| {
             web::block(move || {
-                use crate::diesel::RunQueryDsl;
-                use crate::schema::users;
+                use crate::{diesel::RunQueryDsl, schema::users};
 
                 let new_user = NewUser { steam_id };
 
