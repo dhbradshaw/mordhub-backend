@@ -4,7 +4,6 @@ use crate::{
 };
 use actix_web::{web, HttpResponse};
 use askama::Template;
-use diesel::prelude::*;
 use futures::Future;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -28,7 +27,7 @@ pub fn list(
 ) -> impl Future<Item = HttpResponse, Error = app::Error> {
     let user2 = user.clone();
 
-    web::block(move || LoadoutMultiple::query(user2, &state.get_conn()).map_err(app::Error::from))
+    web::block(move || LoadoutMultiple::query(user2, state.get_db()).map_err(app::Error::from))
         .from_err()
         .and_then(move |loadouts| {
             State::render(LoadoutList {
@@ -70,40 +69,38 @@ pub fn create_post(
     let state_2 = state.clone();
 
     web::block(move || {
-        use crate::schema::loadouts;
-
         let new_loadout = NewLoadout {
             user_id,
             name: form.name.clone(),
             data: form.data.clone(),
         };
 
-        diesel::insert_into(loadouts::table)
-            .values(&new_loadout)
-            .returning(loadouts::id)
-            .get_result::<i32>(&state.get_conn())
-            .map_err(app::Error::from)
+        // diesel::insert_into(loadouts::table)
+        //     .values(&new_loadout)
+        //     .returning(loadouts::id)
+        //     .get_result::<i32>(state.get_db())
+        //     .map_err(app::Error::from)
+        Err(app::Error::NotFound)
     })
     .from_err()
-    .and_then(move |loadout_id| {
+    .and_then(move |loadout_id: i32| {
         web::block(move || {
-            use crate::schema::images;
-
             let new_image = NewImage {
                 url: cloudinary_url,
                 loadout_id,
                 position: 0,
             };
 
-            diesel::insert_into(images::table)
-                .values(&new_image)
-                .execute(&state_2.clone().get_conn())
-                .map_err(app::Error::from)
-                .map(|_| loadout_id)
+            // diesel::insert_into(images::table)
+            //     .values(&new_image)
+            //     .execute(state_2.clone().get_db())
+            //     .map_err(app::Error::from)
+            //     .map(|_| loadout_id)
+            Err(app::Error::NotFound)
         })
     })
     .from_err()
-    .and_then(|id| {
+    .and_then(|id: i32| {
         Ok(HttpResponse::SeeOther()
             .header("Location", format!("/loadouts/{}", id))
             .finish())
@@ -123,23 +120,15 @@ pub fn single(
     user: Option<User>,
     state: web::Data<State>,
 ) -> impl Future<Item = HttpResponse, Error = app::Error> {
-    let state2 = state.clone();
-    let ld_id = *ld_id;
-    let user2 = user.clone();
-
-    let loadout_future = web::block(move || {
-        LoadoutSingle::query(ld_id as i32, user2, &state.get_conn()).map_err(app::Error::db_or_404)
-    })
-    .from_err();
+    let loadout_future = LoadoutSingle::query(*ld_id as i32, user.clone(), state.get_db());
 
     let images_future = web::block(move || {
-        use crate::schema::images::dsl::*;
-
-        images
-            .filter(loadout_id.eq(ld_id as i32))
-            .order_by(position)
-            .load::<Image>(&state2.get_conn())
-            .map_err(app::Error::from)
+        // images
+        //     .filter(loadout_id.eq(ld_id as i32))
+        //     .order_by(position)
+        //     .load::<Image>(state2.get_db())
+        //     .map_err(app::Error::from)
+        Err(app::Error::NotFound)
     })
     .from_err();
 

@@ -1,17 +1,16 @@
-use crate::models::User;
+use crate::{files, models::User};
 use actix_web::HttpResponse;
 use askama::Template;
-use diesel::{
-    r2d2::{ConnectionManager, Pool, PooledConnection},
-    PgConnection,
-};
+use futures::Future;
 use reqwest::r#async::Client;
 
 pub use crate::error::Error;
 
+pub type PgPool = l337::Pool<l337_postgres::PostgresConnectionManager<tokio_postgres::NoTls>>;
+
 pub struct State {
-    pub pool: Pool<ConnectionManager<PgConnection>>,
-    pub reqwest: Client,
+    pool: PgPool,
+    pub reqwest: reqwest::r#async::Client,
 }
 
 #[derive(Debug, Clone)]
@@ -38,8 +37,16 @@ impl TmplBase {
 }
 
 impl State {
-    pub fn get_conn(&self) -> PooledConnection<ConnectionManager<PgConnection>> {
-        self.pool.get().unwrap()
+    pub fn new(db_url: &str, pool: PgPool) -> Self {
+        Self {
+            // DB URL is passed through env var
+            pool: pool,
+            reqwest: Client::new(),
+        }
+    }
+
+    pub fn get_db(&self) -> &PgPool {
+        &self.pool
     }
 
     pub fn render<T: Template>(ctx: T) -> Result<HttpResponse, Error> {

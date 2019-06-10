@@ -4,7 +4,7 @@ use actix_web::{error::BlockingError, HttpResponse, ResponseError};
 #[derive(Debug, Fail)]
 pub enum Error {
     #[fail(display = "database error: {}", _0)]
-    Database(diesel::result::Error),
+    Database(tokio_postgres::Error),
     #[fail(display = "template error: {}", _0)]
     Template(askama::Error),
     #[fail(display = "canceled block")]
@@ -13,6 +13,8 @@ pub enum Error {
     NotFound,
     #[fail(display = "unauthorized")]
     Unauthorized,
+    #[fail(display = "unknown internal error")]
+    Internal,
     #[fail(display = "unauthorized - redirecting to login")]
     RedirectToLogin,
 }
@@ -65,16 +67,26 @@ impl From<BlockingError<Error>> for Error {
     }
 }
 
-impl From<diesel::result::Error> for Error {
-    fn from(e: diesel::result::Error) -> Self {
+impl From<l337::Error<tokio_postgres::Error>> for Error {
+    fn from(e: l337::Error<tokio_postgres::Error>) -> Self {
+        match e {
+            l337::Error::Internal(_) => Error::Internal,
+            l337::Error::External(e) => Error::Database(e),
+        }
+    }
+}
+
+impl From<tokio_postgres::Error> for Error {
+    fn from(e: tokio_postgres::Error) -> Self {
         Error::Database(e)
     }
 }
 
 impl Error {
-    pub fn db_or_404(e: diesel::result::Error) -> Self {
+    pub fn db_or_404(e: tokio_postgres::Error) -> Self {
         match e {
-            diesel::result::Error::NotFound => Error::NotFound,
+            // TODO: Work out what the error code is
+            // tokio_postgres::Error::NotFound => Error::NotFound,
             _ => Error::Database(e),
         }
     }

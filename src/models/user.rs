@@ -1,26 +1,10 @@
-use crate::{app::State, schema::users};
-use actix_web::{
-    dev::Payload,
-    error::BlockingError,
-    http::StatusCode,
-    middleware::identity::Identity,
-    web,
-    FromRequest,
-    HttpRequest,
-    HttpResponse,
-    ResponseError,
-};
-use diesel::{
-    backend::Backend,
-    deserialize::{self, FromSql},
-    serialize::{self, Output, ToSql},
-    sql_types::*,
-};
-use futures::{Future, IntoFuture};
-use std::{io::Write, str::FromStr};
+use crate::app::{self, PgPool, State};
+use actix_web::{dev::Payload, middleware::identity::Identity, web, FromRequest, HttpRequest};
+use futures::{stream::Stream, Future, IntoFuture};
+use std::str::FromStr;
+use tokio_postgres::types::{FromSql, Type};
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, FromSqlRow, AsExpression, Serialize, Deserialize)]
-#[sql_type = "BigInt"]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SteamId(u64);
 
 impl SteamId {
@@ -28,7 +12,7 @@ impl SteamId {
         self.0
     }
 
-    fn as_i64(self) -> i64 {
+    pub fn as_i64(self) -> i64 {
         self.0 as i64
     }
 }
@@ -53,84 +37,78 @@ impl From<SteamId> for i64 {
     }
 }
 
+impl<'a> FromSql<'a> for SteamId {
+    fn from_sql(
+        ty: &Type,
+        raw: &'a [u8],
+    ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        i64::from_sql(ty, raw).map(SteamId::from)
+    }
+
+    fn accepts(ty: &Type) -> bool {
+        i64::accepts(ty)
+    }
+}
+
 impl std::fmt::Display for SteamId {
     fn fmt(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(formatter, "{}", self.as_u64().to_string())
     }
 }
 
-impl<DB: Backend> FromSql<BigInt, DB> for SteamId
-where
-    i64: FromSql<BigInt, DB>,
-{
-    fn from_sql(bytes: Option<&DB::RawValue>) -> deserialize::Result<Self> {
-        let v = i64::from_sql(bytes)?;
-        Ok(SteamId(v as u64))
-    }
-}
-
-impl<DB: Backend> ToSql<BigInt, DB> for SteamId
-where
-    i64: ToSql<BigInt, DB>,
-{
-    fn to_sql<W: Write>(&self, out: &mut Output<W, DB>) -> serialize::Result {
-        self.as_i64().to_sql(out)
-    }
-}
-
-#[derive(Debug, Clone, Insertable, Queryable, Serialize)]
-#[table_name = "users"]
+#[derive(Debug, Clone, Serialize)]
 pub struct User {
     pub id: i32,
     pub steam_id: SteamId,
 }
 
-#[derive(Debug, Insertable)]
-#[table_name = "users"]
-pub struct NewUser {
-    pub steam_id: SteamId,
-}
-
-#[derive(Debug, Fail)]
-pub enum UserFindError {
-    #[fail(display = "Database error: {}", _0)]
-    Db(diesel::result::Error),
-    #[fail(display = "Identity error")]
-    Identity,
-    #[fail(display = "Parse ID error")]
-    ParseError,
-    #[fail(display = "State error")]
-    GetState,
-    #[fail(display = "Not found")]
-    NotFound,
-}
-
-impl ResponseError for UserFindError {
-    fn error_response(&self) -> HttpResponse {
-        match self {
-            UserFindError::NotFound => HttpResponse::new(StatusCode::UNAUTHORIZED),
-            _ => HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
-        }
+impl User {
+    pub fn get_by_steam_id(
+        steam_id: SteamId,
+        pool: &PgPool,
+    ) -> impl Future<Item = User, Error = app::Error> {
+        pool.connection()
+            .and_then(move |mut conn| {
+                conn.client
+                    .prepare("SELECT id, steam_id FROM users WHERE steam_id = $1")
+                    .and_then(move |statement| {
+                        conn.client
+                            .query(&statement, &[&steam_id.as_i64()])
+                            .into_future()
+                            .map(|(r, _)| r)
+                            .map_err(|(e, _)| e)
+                    })
+                    .map_err(|e| l337::Error::External(e))
+            })
+            .from_err()
+            .and_then(|row| match row {
+                Some(row) => Ok(User {
+                    id: row.get(0),
+                    steam_id: row.get(1),
+                }),
+                None => Err(app::Error::Unauthorized),
+            })
     }
 }
 
 impl FromRequest for SteamId {
-    type Error = UserFindError;
+    type Error = app::Error;
     type Future = Result<Self, Self::Error>;
     type Config = ();
 
     fn from_request(req: &HttpRequest, payload: &mut Payload) -> Self::Future {
-        let id = Identity::from_request(req, payload).map_err(|_| UserFindError::Identity)?;
+        // TODO: Should this really be an internal server error?
+        let id = Identity::from_request(req, payload).map_err(|_| app::Error::Internal)?;
         id.identity()
-            .ok_or(UserFindError::NotFound)?
+            .ok_or(app::Error::NotFound)?
             .parse::<SteamId>()
-            .map_err(|_| UserFindError::ParseError)
+            .map_err(|_| app::Error::NotFound)
     }
 }
 
 impl FromRequest for User {
-    type Error = BlockingError<UserFindError>;
-    type Future = Box<dyn Future<Item = Self, Error = BlockingError<UserFindError>>>;
+    type Error = app::Error;
+    type Future = Box<dyn Future<Item = Self, Error = app::Error>>;
     type Config = ();
 
     fn from_request(req: &HttpRequest, payload: &mut Payload) -> Self::Future {
@@ -138,28 +116,8 @@ impl FromRequest for User {
 
         Box::new(
             SteamId::from_request(req, payload)
-                .map_err(BlockingError::Error)
                 .into_future()
-                .and_then(move |s_id| {
-                    web::block(move || {
-                        let user = {
-                            use crate::{
-                                diesel::{ExpressionMethods, QueryDsl, RunQueryDsl},
-                                schema::users::dsl::*,
-                            };
-                            users
-                                // TODO: Use user.id instead of user.steam_id?
-                                .filter(steam_id.eq(s_id))
-                                .first(&state.get_conn())
-                                .map_err(|e| match e {
-                                    diesel::result::Error::NotFound => UserFindError::NotFound,
-                                    _ => UserFindError::Db(e),
-                                })?
-                        };
-
-                        Ok(user)
-                    })
-                }),
+                .and_then(move |steam_id| User::get_by_steam_id(steam_id, state.get_db())),
         )
     }
 }

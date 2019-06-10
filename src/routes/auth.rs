@@ -1,8 +1,8 @@
 use crate::{
-    app::State,
-    models::user::{NewUser, SteamId},
+    app::{self, State},
+    models::user::SteamId,
 };
-use actix_web::{error::BlockingError, middleware::identity::Identity, web, Error, HttpResponse};
+use actix_web::{middleware::identity::Identity, web, Error, HttpResponse};
 use futures::{Future, Stream};
 use url::Url;
 
@@ -76,8 +76,14 @@ pub enum VerifyError {
     Deserialize,
     Invalid,
     SteamId,
-    Db(diesel::result::Error),
-    Interrupted,
+    Db(tokio_postgres::Error),
+    DbTimeout,
+}
+
+impl From<tokio_postgres::Error> for VerifyError {
+    fn from(e: tokio_postgres::Error) -> Self {
+        VerifyError::Db(e)
+    }
 }
 
 pub fn login() -> HttpResponse {
@@ -152,22 +158,24 @@ pub fn callback(
                 .parse::<SteamId>()
                 .map_err(|_| VerifyError::SteamId)
         })
-        .and_then(|steam_id| {
-            web::block(move || {
-                use crate::{diesel::RunQueryDsl, schema::users};
-
-                let new_user = NewUser { steam_id };
-
-                diesel::insert_into(users::table)
-                    .values(&new_user)
-                    .on_conflict_do_nothing()
-                    .execute(&state.get_conn())
-                    .map(|_| steam_id)
-            })
-            .map_err(|e| match e {
-                BlockingError::Error(dbe) => VerifyError::Db(dbe),
-                _ => VerifyError::Interrupted,
-            })
+        .and_then(move |steam_id| {
+            state
+                .get_db()
+                .connection()
+                .and_then(move |mut conn| {
+                    conn.client
+                        .prepare("INSERT INTO users (steam_id) VALUES ($1) ON CONFLICT DO NOTHING")
+                        .and_then(move |statement| {
+                            conn.client
+                                .execute(&statement, &[&steam_id.as_i64()])
+                                .map(move |_| steam_id)
+                        })
+                        .map_err(|e| l337::Error::External(e))
+                })
+                .map_err(|e| match e {
+                    l337::Error::External(e) => VerifyError::Db(e),
+                    _ => VerifyError::DbTimeout,
+                })
         })
         .and_then(move |steam_id| {
             debug!("Verified user {}", steam_id);

@@ -22,7 +22,8 @@ impl Info {
     }
 }
 
-// Compile markdown files in the markdown folder into templates for the templates folder
+// Compile markdown files in the markdown folder into templates for the
+// templates folder
 
 fn main() -> io::Result<()> {
     if std::env::var("SKIP_BUILDRS").unwrap_or("0".to_string()) == "1" {

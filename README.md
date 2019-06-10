@@ -77,3 +77,4 @@ Replace `DBPASSWORD` and `STEAMAPIKEYHERE` as appropriate. The cookie secret doe
 - [ ] Loadout categories
 - [ ] Search function
 - [ ] Team loadouts
+- [ ] Return Options in DB functions

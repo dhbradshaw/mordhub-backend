@@ -1,6 +1,7 @@
 /target
 templates/**/gen
 src/routes/gen/*
+src/schema.rs
 !src/routes/gen/mod.rs
 **/*.rs.bk
 .env
