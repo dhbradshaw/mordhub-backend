@@ -27,14 +27,12 @@ pub fn list(
 ) -> impl Future<Item = HttpResponse, Error = app::Error> {
     let user2 = user.clone();
 
-    web::block(move || LoadoutMultiple::query(user2, state.get_db()).map_err(app::Error::from))
-        .from_err()
-        .and_then(move |loadouts| {
-            State::render(LoadoutList {
-                base: TmplBase::new(user, ActiveLink::Loadouts),
-                loadouts,
-            })
+    LoadoutMultiple::query(user2, state.get_db()).and_then(move |loadouts| {
+        State::render(LoadoutList {
+            base: TmplBase::new(user, ActiveLink::Loadouts),
+            loadouts,
         })
+    })
 }
 
 #[derive(Template)]

@@ -38,7 +38,7 @@ impl TmplBase {
 impl State {
     pub fn new(pool: PgPool) -> Self {
         Self {
-            pool: pool,
+            pool,
             reqwest: Client::new(),
         }
     }

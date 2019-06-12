@@ -1,7 +1,4 @@
-use crate::{
-    app::{self, State},
-    models::user::SteamId,
-};
+use crate::{app::State, models::user::SteamId};
 use actix_web::{middleware::identity::Identity, web, Error, HttpResponse};
 use futures::{Future, Stream};
 use url::Url;

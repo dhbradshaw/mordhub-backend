@@ -63,7 +63,7 @@ Replace `DBPASSWORD` and `STEAMAPIKEYHERE` as appropriate. The cookie secret doe
 12. Celebrate with a glass of champagne.
 
 ## TODO
-- [ ] Continuous Integration with Travis CI
+- [x] Continuous Integration with Travis CI
 - [x] Switch to Askama templating engine
 - [ ] Pagination
 - [x] Image upload
@@ -77,6 +77,7 @@ Replace `DBPASSWORD` and `STEAMAPIKEYHERE` as appropriate. The cookie secret doe
 - [ ] Loadout categories
 - [ ] Search function
 - [ ] Team loadouts
-- [ ] Return Options in DB functions
+- [x] Return Options in DB functions
 - [ ] Parallelize queries in LoadoutSingle
 - [ ] Better handling of `l337` errors
+- [ ] Reduce SQL boilerplate
