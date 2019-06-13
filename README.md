@@ -29,6 +29,8 @@ from the project root. It may take about 10 minutes to compile from scratch, and
 
 Also make sure to stop any local postgres services you might be running as docker will complain about port 5432 being used.
 
+On Windows, you may need to comment out the `netdata` service in `docker-compose.yml`.
+
 ### Manual
 
 1. Install PostgreSQL 11 for your platform. Follow the guide [here](https://github.com/diesel-rs/diesel/blob/master/guide_drafts/backend_installation.md). On Windows, I used the enterprise installer then added the `bin/` folder to my `Path` environment variable. You don't need to bother installing the `stack builder` component but install the others, if prompted. Remember the password you set for the superuser account during installation. On Linux, you will need to [set the password manually](https://serverfault.com/a/248162). Leave the default port (5432).

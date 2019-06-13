@@ -11,6 +11,7 @@ services:
       - "3000:3000"
     depends_on:
       - postgres
+
   postgres:
     image: "postgres:alpine"
     environment:
@@ -20,6 +21,22 @@ services:
       - backend
     ports:
       - "7654:5432"
+
+  # Note that this almost certainly will not work on Windows.
+  # Simply comment this out and it should work fine nonetheless.
+  netdata:
+    image: netdata/netdata
+    hostname: mordhub.com
+    ports:
+      - 19999:19999
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
 
 networks:
   backend:
