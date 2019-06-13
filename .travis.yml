@@ -8,7 +8,7 @@ install:
   - sudo dpkg -i ripgrep_11.0.1_amd64.deb
   - echo "POSTGRES_USER=admin" >> .env
   - echo "POSTGRES_PASSWORD=Password1" >> .env
-  - echo "DATABASE_URL=postgres://admin:Password1@postgres/mordhub" >> .env
+  - echo "DATABASE_URL=postgres://admin:Password1@postgres/mordhub?sslmode=disable" >> .env
   - echo "STEAM_API_KEY=$STEAMAPIKEY" >> .env
   - echo "COOKIE_SECRET=RMCLVcuHYboeeOgDxm53aLkNPKC4UMWU" >> .env
   - echo "SITE_URL=http://localhost:3000" >> .env

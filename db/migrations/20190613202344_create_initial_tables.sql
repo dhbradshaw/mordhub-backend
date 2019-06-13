@@ -1,3 +1,4 @@
+-- migrate:up
 CREATE TABLE users (
   id SERIAL PRIMARY KEY,
   steam_id BIGINT UNIQUE NOT NULL
@@ -24,3 +25,10 @@ CREATE TABLE likes (
   user_id INTEGER NOT NULL REFERENCES users(id),
   loadout_id INTEGER NOT NULL REFERENCES loadouts(id)
 );
+
+
+-- migrate:down
+DROP TABLE likes;
+DROP TABLE images;
+DROP TABLE loadouts;
+DROP TABLE users;
