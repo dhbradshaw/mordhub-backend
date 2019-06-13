@@ -121,21 +121,25 @@ pub fn single(
     user: Option<User>,
     state: web::Data<State>,
 ) -> impl Future<Item = HttpResponse, Error = app::Error> {
-    // TODO: Optimise to use just one connection
+    state
+        .get_db()
+        .connection()
+        .from_err()
+        .and_then(move |mut conn| {
+            let loadout_future = LoadoutSingle::query(*ld_id as i32, user.clone(), &mut conn)
+                .and_then(|ldt| ldt.ok_or(app::Error::NotFound));
 
-    let loadout_future = LoadoutSingle::query(*ld_id as i32, user.clone(), state.get_db())
-        .and_then(|ldt| ldt.ok_or(app::Error::NotFound));
+            let images_future = Image::query(*ld_id as i32, &mut conn);
 
-    let images_future = Image::query(*ld_id as i32, state.get_db());
-
-    // Run queries in parallel
-    images_future.join(loadout_future).and_then(
-        move |(images, loadout): (Vec<Image>, LoadoutSingle)| {
-            State::render(LoadoutSingleTmpl {
-                base: TmplBase::new(user, ActiveLink::Loadouts),
-                loadout,
-                images,
-            })
-        },
-    )
+            // Run queries in parallel
+            images_future.join(loadout_future).and_then(
+                move |(images, loadout): (Vec<Image>, LoadoutSingle)| {
+                    State::render(LoadoutSingleTmpl {
+                        base: TmplBase::new(user, ActiveLink::Loadouts),
+                        loadout,
+                        images,
+                    })
+                },
+            )
+        })
 }

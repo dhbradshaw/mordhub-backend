@@ -5,7 +5,8 @@ use reqwest::r#async::Client;
 
 pub use crate::error::Error;
 
-pub type PgPool = l337::Pool<l337_postgres::PostgresConnectionManager<tokio_postgres::NoTls>>;
+pub type PgPool = l337::Pool<crate::db::ConnectionManager>;
+pub type PgConn = crate::db::Connection;
 
 pub struct State {
     pool: PgPool,

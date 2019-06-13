@@ -4,8 +4,11 @@ extern crate log;
 extern crate serde;
 #[macro_use]
 extern crate failure;
+#[macro_use]
+extern crate derive_builder;
 
 mod app;
+mod db;
 mod error;
 mod files;
 mod models;
@@ -40,7 +43,7 @@ fn main() {
         .parse()
         .expect("failed to parse db url");
 
-    let mgr = l337_postgres::PostgresConnectionManager::new(db_cfg, tokio_postgres::NoTls);
+    let mgr = db::ConnectionManager::new(db_cfg, tokio_postgres::NoTls);
 
     let pool_cfg = l337::Config {
         min_size: 4,
