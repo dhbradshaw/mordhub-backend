@@ -31,6 +31,12 @@ impl From<i64> for SteamId {
     }
 }
 
+impl From<u64> for SteamId {
+    fn from(i: u64) -> Self {
+        Self(i)
+    }
+}
+
 impl From<SteamId> for i64 {
     fn from(id: SteamId) -> i64 {
         id.0 as i64
