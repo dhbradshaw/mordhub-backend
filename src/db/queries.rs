@@ -53,4 +53,6 @@ typed_queries! {
         FROM loadouts \
         WHERE loadouts.id = $1",
         [Type::INT4];
+
+    post_login_insert_user => "INSERT INTO users (steam_id) VALUES ($1) ON CONFLICT DO NOTHING", [Type::INT8];
 }

@@ -160,14 +160,11 @@ pub fn callback(
                 .get_db()
                 .connection()
                 .and_then(move |mut conn| {
+                    let conn = &mut *conn;
                     conn.client
-                        .prepare("INSERT INTO users (steam_id) VALUES ($1) ON CONFLICT DO NOTHING")
-                        .and_then(move |statement| {
-                            conn.client
-                                .execute(&statement, &[&steam_id.as_i64()])
-                                .map(move |_| steam_id)
-                        })
-                        .map_err(|e| l337::Error::External(e))
+                        .execute(&conn.queries.post_login_insert_user, &[&steam_id.as_i64()])
+                        .map(move |_| steam_id)
+                        .map_err(l337::Error::External)
                 })
                 .map_err(|e| match e {
                     l337::Error::External(e) => VerifyError::Db(e),
