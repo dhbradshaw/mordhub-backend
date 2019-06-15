@@ -82,7 +82,7 @@ Replace `DBPASSWORD` and `STEAMAPIKEYHERE` as appropriate. The cookie secret doe
 - [x] Better handling of `l337` errors
 - [x] Reduce SQL boilerplate
 - [x] Use netdata
-- [ ] Use dbmate instead of diesel
+- [x] Use dbmate instead of diesel
 - [ ] Look into using ErrorHandlers
-- [ ] Separate crate for login with steam
+- [x] Separate crate for login with steam
 - [ ] Investigate rust on the frontend with Percy
