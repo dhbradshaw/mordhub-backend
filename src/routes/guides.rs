@@ -16,18 +16,3 @@ pub fn list(user: Option<User>) -> Result<HttpResponse, app::Error> {
         base: TmplBase::new(user, ActiveLink::Guides),
     })
 }
-
-// pub fn single(
-//     path: web::Path<String>,
-//     user: Option<User>,
-//     state: web::Data<State>,
-// ) -> Result<HttpResponse, app::Error> {
-//     let (template, title) = match path.as_str() {
-//         "test" => ("guides/gen/test.html", "Test"),
-//         _ => return Err(app::Error::NotFound),
-//     };
-
-//     let ctx = State::tera_context(PageTitle::GuideSingle(title), user);
-
-//     state.render(template, ctx)
-// }

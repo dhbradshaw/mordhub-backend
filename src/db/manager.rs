@@ -72,7 +72,7 @@ where
                     receiver,
                     queries,
                 })
-                .map_err(|e| l337::Error::External(e)),
+                .map_err(l337::Error::External),
         )
     }
 
