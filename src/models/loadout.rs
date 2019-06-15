@@ -13,7 +13,7 @@ pub struct LoadoutSingle {
     pub data: String,
     pub created_at: NaiveDateTime,
     pub like_count: i64,
-    pub has_liked: bool, // Whether the current user has already liked this loadout
+    pub has_liked: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -24,7 +24,7 @@ pub struct LoadoutMultiple {
     pub data: String,
     pub created_at: NaiveDateTime,
     pub like_count: i64,
-    pub has_liked: bool, // Whether the current user has already liked this loadout
+    pub has_liked: bool,
     pub main_image_url: String,
     pub user_steam_id: SteamId,
 }
@@ -36,48 +36,39 @@ impl LoadoutMultiple {
     ) -> impl Future<Item = Vec<Self>, Error = app::Error> {
         let with_user = user.is_some();
 
+        // f3d5pzxulmlbpanpf5sc
         pool.connection()
             .from_err::<app::Error>()
             .and_then(move |mut conn| {
-                // f3d5pzxulmlbpanpf5sc
-                let query_with_user = "SELECT id, user_id, name, data, created_at, \
-                        (SELECT COUNT(*) FROM likes WHERE likes.loadout_id = loadouts.id) as like_count, \
-                        (SELECT steam_id FROM users WHERE users.id = loadouts.user_id) as user_steam_id, \
-                        (SELECT url FROM images WHERE images.loadout_id = loadouts.id AND images.position = 0) as main_image_url, \
-                        EXISTS (SELECT user_id FROM likes WHERE user_id = $1) AS has_liked FROM loadouts";
-                let query_no_user = "SELECT id, user_id, name, data, created_at, \
-                        (SELECT COUNT(*) FROM likes WHERE likes.loadout_id = loadouts.id) as like_count, \
-                        (SELECT steam_id FROM users WHERE users.id = loadouts.user_id) as user_steam_id, \
-                        (SELECT url FROM images WHERE images.loadout_id = loadouts.id AND images.position = 0) as main_image_url FROM loadouts";
-
-                conn.client.prepare(if with_user { query_with_user } else { query_no_user })
-                    .map(move |row| (conn, row, user.map(|u| u.id).unwrap_or(0)))
-                    .from_err()
-            })
-            .and_then(move |(mut conn, statement, user_id)| {
+                let conn = &mut *conn;
                 let query = if with_user {
-                    conn.client.query(&statement, &[&user_id])
+                    conn.client.query(
+                        &conn.queries.loadout_multiple_with_user,
+                        &[&user.unwrap().id],
+                    )
                 } else {
-                    conn.client.query(&statement, &[])
+                    conn.client
+                        .query(&conn.queries.loadout_multiple_without_user, &[])
                 };
 
-                query
-                    .collect()
-                    .from_err()
+                query.collect().from_err()
             })
-            .and_then(move |rows|
-                Ok(rows.into_iter().map(|row| LoadoutMultiple {
-                    id: row.get(0),
-                    user_id: row.get(1),
-                    name: row.get(2),
-                    data: row.get(3),
-                    created_at: row.get(4),
-                    like_count: row.get(5),
-                    user_steam_id: row.get(6),
-                    main_image_url: row.get(7),
-                    has_liked: if with_user { row.get(8) } else { false },
-                }).collect())
-        )
+            .and_then(move |rows| {
+                Ok(rows
+                    .into_iter()
+                    .map(|row| LoadoutMultiple {
+                        id: row.get(0),
+                        user_id: row.get(1),
+                        name: row.get(2),
+                        data: row.get(3),
+                        created_at: row.get(4),
+                        like_count: row.get(5),
+                        user_steam_id: row.get(6),
+                        main_image_url: row.get(7),
+                        has_liked: if with_user { row.get(8) } else { false },
+                    })
+                    .collect())
+            })
     }
 }
 

@@ -65,42 +65,38 @@ pub fn create_post(
 
     let user_id = user.id;
 
-    state.get_db()
+    state
+        .get_db()
         .connection()
-        .and_then(|mut conn| {
-            conn.client.prepare(
-                "INSERT INTO loadouts (user_id, name, data, created_at) VALUES ($1, $2, $3, DEFAULT) RETURNING id"
-            )
-                .map_err(l337::Error::External)
-                .map(|statement| (conn, statement))
-        })
         .from_err()
-        .and_then(move |(mut conn, statement)|
-            conn.client.query(&statement, &[&user_id, &form.name, &form.data])
+        .and_then(move |mut conn_ptr| {
+            let conn = &mut *conn_ptr;
+            conn.client
+                .query(
+                    &conn.queries.create_loadout,
+                    &[&user_id, &form.name, &form.data],
+                )
                 .into_future()
-                .map_err(|(e, _)| e)
-                .map(|(r, _)| (conn, r))
-                .from_err()
-        )
+                .map(|(r, _)| (conn_ptr, r))
+                .map_err(|(e, _)| app::Error::from(e))
+        })
         .and_then(|(conn, row)| match row {
-            Some(row) => Ok((conn, row.get(0))),
+            Some(row) => Ok((conn, row.get::<_, i32>(0))),
             None => Err(app::Error::DbNothingReturned),
         })
-        .and_then(move |(mut conn, loadout_id): (_, i32)| {
-            conn.client.prepare(
-                "INSERT INTO images (url, loadout_id, position) VALUES ($1, $2, $3)"
-            )
-                .map(move |statement| (conn, loadout_id, statement))
-                .from_err()
-        })
-        .and_then(move |(mut conn, loadout_id, statement)|
-            // TODO: Position
-            conn.client.query(&statement, &[&cloudinary_url, &loadout_id, &0i32])
+        .and_then(move |(mut conn, loadout_id)| {
+            // TODO: Handle position when multiple images uploaded
+            let conn = &mut *conn;
+            conn.client
+                .query(
+                    &conn.queries.create_image,
+                    &[&cloudinary_url, &loadout_id, &0i32],
+                )
                 .into_future()
                 .map_err(|(e, _)| e)
                 .map(move |_| loadout_id)
                 .from_err()
-        )
+        })
         .and_then(|loadout_id| {
             Ok(HttpResponse::SeeOther()
                 .header("Location", format!("/loadouts/{}", loadout_id))

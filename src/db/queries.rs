@@ -36,6 +36,7 @@ macro_rules! typed_queries {
     }
 }
 
+// https://docs.rs/tokio-postgres/0.4.0-rc.2/tokio_postgres/types/struct.Type.html
 typed_queries! {
     get_image_by_id => "SELECT id, url, loadout_id, position, created_at FROM images WHERE loadout_id = $1 ORDER BY position ASC", [Type::INT4];
 
@@ -54,5 +55,30 @@ typed_queries! {
         WHERE loadouts.id = $1",
         [Type::INT4];
 
+    loadout_multiple_with_user =>
+        "SELECT id, user_id, name, data, created_at, \
+        (SELECT COUNT(*) FROM likes WHERE likes.loadout_id = loadouts.id) as like_count, \
+        (SELECT steam_id FROM users WHERE users.id = loadouts.user_id) as user_steam_id, \
+        (SELECT url FROM images WHERE images.loadout_id = loadouts.id AND images.position = 0) as main_image_url, \
+        EXISTS (SELECT user_id FROM likes WHERE user_id = $1) AS has_liked FROM loadouts",
+        [Type::INT4];
+
+    loadout_multiple_without_user =>
+        "SELECT id, user_id, name, data, created_at, \
+        (SELECT COUNT(*) FROM likes WHERE likes.loadout_id = loadouts.id) as like_count, \
+        (SELECT steam_id FROM users WHERE users.id = loadouts.user_id) as user_steam_id, \
+        (SELECT url FROM images WHERE images.loadout_id = loadouts.id AND images.position = 0) as main_image_url FROM loadouts",
+        [];
+
+    get_user_by_id => "SELECT id, steam_id FROM users WHERE steam_id = $1", [Type::INT4];
+
     post_login_insert_user => "INSERT INTO users (steam_id) VALUES ($1) ON CONFLICT DO NOTHING", [Type::INT8];
+
+    create_loadout =>
+        "INSERT INTO loadouts (user_id, name, data, created_at) VALUES ($1, $2, $3, DEFAULT) RETURNING id",
+        [Type::INT4, Type::VARCHAR, Type::VARCHAR, Type::TIMESTAMP];
+
+    create_image =>
+        "INSERT INTO images (url, loadout_id, position) VALUES ($1, $2, $3)",
+        [Type::VARCHAR, Type::INT4, Type::INT4];
 }

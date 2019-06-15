@@ -74,19 +74,15 @@ impl User {
         pool: &PgPool,
     ) -> impl Future<Item = Option<User>, Error = app::Error> {
         pool.connection()
-            .and_then(move |mut conn| {
-                conn.client
-                    .prepare("SELECT id, steam_id FROM users WHERE steam_id = $1")
-                    .and_then(move |statement| {
-                        conn.client
-                            .query(&statement, &[&steam_id.as_i64()])
-                            .into_future()
-                            .map(|(r, _)| r)
-                            .map_err(|(e, _)| e)
-                    })
-                    .map_err(l337::Error::External)
-            })
             .from_err()
+            .and_then(move |mut conn| {
+                let conn = &mut *conn;
+                conn.client
+                    .query(&conn.queries.get_user_by_id, &[&steam_id.as_i64()])
+                    .into_future()
+                    .map(|(r, _)| r)
+                    .map_err(|(e, _)| app::Error::from(e))
+            })
             .and_then(|row| {
                 Ok(row.map(|row| User {
                     id: row.get(0),
