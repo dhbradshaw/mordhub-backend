@@ -1,7 +1,11 @@
 use crate::models::User;
-use actix_web::HttpResponse;
+use actix_web::{
+    client::{Client, ClientBuilder, Connector},
+    HttpResponse,
+};
 use askama::Template;
-use reqwest::r#async::Client;
+use openssl::ssl::{SslConnector, SslMethod};
+use std::time::Duration;
 
 pub use crate::error::Error;
 
@@ -10,7 +14,8 @@ pub type PgConn = crate::db::Connection;
 
 pub struct State {
     pool: PgPool,
-    pub reqwest: reqwest::r#async::Client,
+    pub client: Client,
+    pub redirector: steam_auth::Redirector,
 }
 
 #[derive(Debug, Clone)]
@@ -37,10 +42,22 @@ impl TmplBase {
 }
 
 impl State {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: PgPool, redirector: steam_auth::Redirector) -> Self {
+        let connector = Connector::new()
+            .ssl(
+                SslConnector::builder(SslMethod::tls())
+                    .expect("unable to build SSL connector")
+                    .build(),
+            )
+            .timeout(Duration::from_secs(5))
+            .finish();
+
+        let ssl_client = ClientBuilder::new().connector(connector).finish();
+
         Self {
             pool,
-            reqwest: Client::new(),
+            client: ssl_client,
+            redirector,
         }
     }
 

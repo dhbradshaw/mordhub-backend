@@ -19,6 +19,8 @@ pub enum Error {
     DbNothingReturned,
     #[fail(display = "unauthorized - redirecting to login")]
     RedirectToLogin,
+    #[fail(display = "error sending HTTP request")]
+    SendRequestError,
     #[fail(display = "failed to authenticate with steam: {}", _0)]
     SteamAuth(steam_auth::Error),
 }
