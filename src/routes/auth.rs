@@ -2,18 +2,12 @@ use crate::{
     app::{self, State},
     models::user::SteamId,
 };
-use actix_web::{middleware::identity::Identity, web, Error, HttpResponse};
+use actix_web::{middleware::identity::Identity, web, HttpRequest, HttpResponse};
 use futures::Future;
 
-pub fn login() -> Result<HttpResponse, app::Error> {
-    let site_url = std::env::var("SITE_URL").expect("SITE_URL is not set");
-
-    // TODO: Put this in app::State
-    let target_url =
-        steam_auth::get_login_url(site_url, "/auth/callback").map_err(app::Error::SteamAuth)?;
-
+pub fn login(state: web::Data<State>) -> Result<HttpResponse, app::Error> {
     Ok(HttpResponse::Found()
-        .header("Location", target_url.as_str())
+        .header("Location", state.redirector.url().as_str())
         .finish())
 }
 
@@ -25,11 +19,11 @@ pub fn logout(id: Identity) -> HttpResponse {
 }
 
 pub fn callback(
+    req: HttpRequest,
     id: Identity,
     state: web::Data<State>,
-    form: web::Query<steam_auth::SteamAuthResponse>,
-) -> impl Future<Item = HttpResponse, Error = Error> {
-    steam_auth::verify_response_async(&state.reqwest, form.into_inner())
+) -> impl Future<Item = HttpResponse, Error = app::Error> {
+    steam_auth::Verifier::make_verify_request_async(&state.reqwest, req.query_string().to_owned())
         .map(SteamId::from)
         .map_err(app::Error::SteamAuth)
         .and_then(move |steam_id| {
@@ -49,11 +43,5 @@ pub fn callback(
             debug!("Verified user {}", steam_id);
             id.remember(steam_id.to_string());
             Ok(HttpResponse::Found().header("Location", "/").finish())
-        })
-        .map_err(|e| {
-            debug!("Verify error: {:?}", e);
-            HttpResponse::Unauthorized()
-                .body("authentication failed")
-                .into()
         })
 }

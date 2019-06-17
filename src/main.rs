@@ -54,8 +54,14 @@ fn main() {
         .block_on(l337::Pool::new(mgr, pool_cfg))
         .expect("db connection error");
 
+    let redirector = steam_auth::Redirector::new(
+        std::env::var("SITE_URL").expect("SITE_URL is not set"),
+        "/auth/callback",
+    )
+    .expect("failed to build steam auth redirector");
+
     HttpServer::new(move || {
-        let state = app::State::new(pool.clone());
+        let state = app::State::new(pool.clone(), redirector.clone());
 
         App::new()
             .data(state)

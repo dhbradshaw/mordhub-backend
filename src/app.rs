@@ -11,6 +11,7 @@ pub type PgConn = crate::db::Connection;
 pub struct State {
     pool: PgPool,
     pub reqwest: reqwest::r#async::Client,
+    pub redirector: steam_auth::Redirector,
 }
 
 #[derive(Debug, Clone)]
@@ -37,10 +38,11 @@ impl TmplBase {
 }
 
 impl State {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: PgPool, redirector: steam_auth::Redirector) -> Self {
         Self {
             pool,
             reqwest: Client::new(),
+            redirector,
         }
     }
 
